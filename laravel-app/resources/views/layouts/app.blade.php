@@ -11,19 +11,19 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --app-bg: #f6f8fb;
+            --app-bg: #f5f9fb;
             --surface: #ffffff;
             --surface-soft: #eef6f8;
-            --line: #dbe5ea;
-            --text-main: #102033;
+            --line: #d6e2ea;
+            --text-main: #0f1f2f;
             --text-soft: #607086;
-            --brand: #0e7490;
-            --brand-deep: #155e75;
-            --brand-light: #e0f2fe;
+            --brand: #0f766e;
+            --brand-deep: #0f5e57;
+            --brand-light: #dff7f2;
             --accent: #f59e0b;
             --success: #16a34a;
-            --shadow-sm: 0 2px 10px rgba(16, 32, 51, 0.06);
-            --shadow-md: 0 18px 45px rgba(16, 32, 51, 0.08);
+            --shadow-sm: 0 2px 12px rgba(15, 32, 50, 0.06);
+            --shadow-md: 0 20px 50px rgba(15, 32, 50, 0.1);
             --radius-lg: 20px;
             --radius-md: 12px;
         }
@@ -34,7 +34,7 @@
             font-family: "Plus Jakarta Sans", sans-serif;
             color: var(--text-main);
             background:
-                linear-gradient(180deg, rgba(224, 242, 254, 0.55), rgba(246, 248, 251, 0) 360px),
+                linear-gradient(180deg, rgba(223, 247, 242, 0.55), rgba(246, 248, 251, 0) 360px),
                 var(--app-bg);
             -webkit-font-smoothing: antialiased;
         }
@@ -56,11 +56,11 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #38bdf8 0%, #0e7490 100%);
+            background: linear-gradient(135deg, #5eead4 0%, #0f766e 100%);
             color: #fff;
             font-weight: 800;
             font-size: 1.05rem;
-            box-shadow: 0 10px 22px rgba(14, 116, 144, 0.24);
+            box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);
         }
 
         .navbar-brand {
@@ -97,6 +97,22 @@
             padding: 2.25rem;
             box-shadow: var(--shadow-md);
             min-height: calc(100vh - 190px);
+        }
+
+        .card-surface {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .section-title {
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .section-subtitle {
+            color: var(--text-soft);
         }
 
         .eyebrow {

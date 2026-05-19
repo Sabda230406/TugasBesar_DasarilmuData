@@ -13,20 +13,72 @@
             border-radius: 26px;
             padding: 2.5rem;
             background:
-                linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(14, 116, 144, 0.92)),
+                linear-gradient(135deg, rgba(15, 32, 47, 0.92), rgba(15, 118, 110, 0.88)),
                 url("https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1400&q=80");
             background-size: cover;
             background-position: center;
             color: #fff;
             min-height: 460px;
-            display: grid;
-            align-items: end;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 24px 50px rgba(15, 32, 50, 0.2);
         }
 
         .hero-content {
             max-width: 760px;
             position: relative;
             z-index: 1;
+        }
+
+        .hero-card {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 22px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 16px 34px rgba(15, 32, 50, 0.2);
+        }
+
+        .hero-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .hero-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #e2f6f3;
+        }
+
+        .quick-stat {
+            border: 1px solid rgba(15, 118, 110, 0.16);
+            border-radius: 18px;
+            padding: 1.25rem;
+            background: #ffffff;
+            box-shadow: 0 14px 28px rgba(15, 32, 50, 0.08);
+        }
+
+        .quick-stat .icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f766e;
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .action-card {
+            border-radius: 20px;
+            border: 1px solid rgba(15, 118, 110, 0.16);
+            background: linear-gradient(135deg, rgba(223, 247, 242, 0.9), rgba(255, 255, 255, 0.95));
+            padding: 1.5rem;
+            box-shadow: 0 14px 28px rgba(15, 32, 50, 0.08);
         }
 
         .hero-badge {
@@ -47,7 +99,7 @@
             text-transform: uppercase;
             font-size: 0.72rem;
             font-weight: 800;
-            color: #0e7490;
+            color: #0f766e;
             margin-bottom: 0.55rem;
         }
 
@@ -67,8 +119,8 @@
             min-height: 340px;
             border-radius: 24px;
             background:
-                linear-gradient(135deg, rgba(224, 242, 254, 0.94), rgba(236, 253, 245, 0.98));
-            border: 1px solid rgba(14, 116, 144, 0.14);
+                linear-gradient(135deg, rgba(223, 247, 242, 0.94), rgba(236, 253, 245, 0.98));
+            border: 1px solid rgba(15, 118, 110, 0.18);
             display: grid;
             place-items: center;
             padding: 2rem;
@@ -81,8 +133,8 @@
             display: grid;
             place-items: center;
             position: relative;
-            background: radial-gradient(circle, #ffffff 0 42%, rgba(14, 116, 144, 0.12) 43% 100%);
-            box-shadow: inset 0 0 0 18px rgba(255, 255, 255, 0.55), 0 24px 45px rgba(14, 116, 144, 0.16);
+            background: radial-gradient(circle, #ffffff 0 42%, rgba(15, 118, 110, 0.12) 43% 100%);
+            box-shadow: inset 0 0 0 18px rgba(255, 255, 255, 0.55), 0 24px 45px rgba(15, 118, 110, 0.16);
         }
 
         .brain-illustration::before,
@@ -178,19 +230,76 @@
 
     <div class="landing-shell">
         <section class="hero-section">
-            <div class="hero-content">
-                <span class="hero-badge mb-3">
-                    <i class="fa-solid fa-heart-pulse"></i>
-                    Stroke Risk Prediction
-                </span>
-                <h1 class="display-5 fw-bold mb-3">Deteksi Risiko Stroke Berbasis Machine Learning</h1>
-                <p class="lead text-white-50 mb-4">
-                    Web ini membantu mengklasifikasikan potensi risiko stroke berdasarkan data kesehatan,
-                    gaya hidup, dan riwayat medis pengguna.
-                </p>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="{{ route('form') }}" class="btn btn-light btn-lg fw-bold px-4">Mulai Prediksi</a>
-                    <a href="#dataset" class="btn btn-outline-light btn-lg fw-bold px-4">Lihat Dataset</a>
+            <div class="row g-4 align-items-center w-100">
+                <div class="col-lg-7">
+                    <div class="hero-content">
+                        <span class="hero-badge mb-3">
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            Stroke Risk Prediction
+                        </span>
+                        <h1 class="display-5 fw-bold mb-3">
+                            <i class="fa-solid fa-shield-heart me-2"></i>
+                            Deteksi Risiko Stroke Berbasis Machine Learning
+                        </h1>
+                        <p class="lead text-white-50 mb-4">
+                            Web ini membantu mengklasifikasikan potensi risiko stroke berdasarkan data kesehatan,
+                            gaya hidup, dan riwayat medis pengguna.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ route('form') }}" class="btn btn-light btn-lg fw-bold px-4">Mulai Prediksi</a>
+                            <a href="#dataset" class="btn btn-outline-light btn-lg fw-bold px-4">Lihat Dataset</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="hero-card">
+                        <p class="text-uppercase small fw-bold text-white-50 mb-3">Project Snapshot</p>
+                        <div class="hero-list">
+                            <div class="hero-list-item">
+                                <span>Dataset</span>
+                                <span>Healthcare Stroke</span>
+                            </div>
+                            <div class="hero-list-item">
+                                <span>Model</span>
+                                <span>Random Forest</span>
+                            </div>
+                            <div class="hero-list-item">
+                                <span>Akurasi</span>
+                                <span>95%</span>
+                            </div>
+                            <div class="hero-list-item">
+                                <span>Output</span>
+                                <span>Risiko Rendah/Tinggi</span>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <a href="{{ route('form') }}" class="btn btn-light w-100 fw-bold">Coba Prediksi Sekarang</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="row g-4">
+            <div class="col-md-4">
+                <div class="quick-stat">
+                    <div class="icon"><i class="fa-solid fa-heart-circle-check"></i></div>
+                    <h3 class="h6 fw-bold mb-2">Screening Cepat</h3>
+                    <p class="soft-copy mb-0">Input data pasien dan dapatkan hasil risiko secara cepat dan jelas.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="quick-stat">
+                    <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
+                    <h3 class="h6 fw-bold mb-2">Bantu Keputusan</h3>
+                    <p class="soft-copy mb-0">Ringkasan risiko membantu edukasi dan langkah pencegahan awal.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="quick-stat">
+                    <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+                    <h3 class="h6 fw-bold mb-2">Riwayat Terpantau</h3>
+                    <p class="soft-copy mb-0">Semua hasil tersimpan dan bisa dipantau di halaman history.</p>
                 </div>
             </div>
         </section>
@@ -218,7 +327,7 @@
             </div>
         </section>
 
-        <section class="row g-4">
+    <section class="row g-4" id="dataset">
             <div class="col-md-4">
                 <div class="model-card">
                     <p class="section-kicker">Model</p>
@@ -238,6 +347,19 @@
                     <p class="section-kicker">Output</p>
                     <h3 class="h5 fw-bold mb-2">Risiko Rendah / Tinggi</h3>
                     <p class="soft-copy mb-0">Hasil prediksi ditampilkan sebagai label risiko dan tersimpan di halaman riwayat.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="action-card">
+            <div class="row align-items-center g-3">
+                <div class="col-lg-8">
+                    <p class="section-kicker">Siap Mulai</p>
+                    <h2 class="fw-bold mb-2">Mulai prediksi sekarang dan lihat hasilnya secara instan.</h2>
+                    <p class="soft-copy mb-0">Data Anda aman dan hanya digunakan untuk estimasi risiko.</p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <a href="{{ route('form') }}" class="btn btn-dark btn-lg w-100">Mulai Prediksi</a>
                 </div>
             </div>
         </section>

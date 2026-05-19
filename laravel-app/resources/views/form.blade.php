@@ -3,17 +3,17 @@
 @section('content')
 	<style>
 		.form-hero {
-			background: linear-gradient(135deg, rgba(14, 116, 144, 0.12) 0%, rgba(14, 116, 144, 0.02) 100%);
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			background: linear-gradient(135deg, rgba(15, 118, 110, 0.14) 0%, rgba(15, 118, 110, 0.02) 100%);
+			border: 1px solid rgba(15, 118, 110, 0.18);
 			border-radius: 18px;
 			padding: 1.5rem 1.75rem;
 		}
 
 		.form-card {
 			border-radius: 18px;
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			border: 1px solid rgba(214, 226, 234, 0.9);
 			background: #fff;
-			box-shadow: 0 18px 35px rgba(15, 23, 42, 0.06);
+			box-shadow: 0 16px 32px rgba(15, 32, 50, 0.08);
 			padding: 1.5rem;
 		}
 
@@ -31,14 +31,14 @@
 		.form-control,
 		.form-select {
 			border-radius: 12px;
-			border-color: rgba(148, 163, 184, 0.4);
+			border-color: rgba(148, 163, 184, 0.35);
 			padding: 0.7rem 0.9rem;
 		}
 
 		.form-control:focus,
 		.form-select:focus {
-			box-shadow: 0 0 0 0.2rem rgba(14, 116, 144, 0.15);
-			border-color: rgba(14, 116, 144, 0.6);
+			box-shadow: 0 0 0 0.2rem rgba(15, 118, 110, 0.16);
+			border-color: rgba(15, 118, 110, 0.65);
 		}
 
 		.form-footer {
@@ -51,7 +51,7 @@
 		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
 			<div>
 				<p class="eyebrow mb-2">Form Prediksi</p>
-				<h1 class="h4 fw-bold mb-2">Masukkan data pasien untuk prediksi risiko stroke.</h1>
+				<h1 class="h4 fw-bold mb-2"><i class="fa-solid fa-file-medical me-2"></i>Masukkan data pasien untuk prediksi risiko stroke.</h1>
 				<p class="mb-0 text-muted">Lengkapi seluruh field agar hasil prediksi lebih akurat.</p>
 			</div>
 			<div class="text-end">
@@ -75,7 +75,7 @@
 
 		<div class="col-lg-6">
 			<div class="form-card h-100">
-				<h6 class="form-section-title">Profil Pasien</h6>
+				<h6 class="form-section-title"><i class="fa-solid fa-user-nurse me-2"></i>Profil Pasien</h6>
 				<p class="form-helper mb-4">Informasi dasar demografis pasien.</p>
 				<div class="row g-3">
 					<div class="col-md-6">
@@ -120,7 +120,7 @@
 
 		<div class="col-lg-6">
 			<div class="form-card h-100">
-				<h6 class="form-section-title">Kondisi Kesehatan</h6>
+				<h6 class="form-section-title"><i class="fa-solid fa-notes-medical me-2"></i>Riwayat Kesehatan</h6>
 				<p class="form-helper mb-4">Detail medis dan gaya hidup yang memengaruhi risiko.</p>
 				<div class="row g-3">
 					<div class="col-md-6">
@@ -143,9 +143,19 @@
 							name="avg_glucose_level" value="{{ old('avg_glucose_level') }}" placeholder="Contoh: 110.5" required>
 					</div>
 					<div class="col-md-6">
-						<label class="form-label" for="bmi">BMI</label>
-						<input class="form-control" id="bmi" type="number" step="0.1" name="bmi"
-							value="{{ old('bmi') }}" placeholder="Contoh: 24.2" required>
+						<label class="form-label" for="weight">Berat Badan (kg)</label>
+						<input class="form-control" id="weight" type="number" step="0.1" min="0"
+							value="{{ old('weight') }}" placeholder="Contoh: 65" required>
+					</div>
+					<div class="col-md-6">
+						<label class="form-label" for="height">Tinggi Badan (cm)</label>
+						<input class="form-control" id="height" type="number" step="0.1" min="0"
+							value="{{ old('height') }}" placeholder="Contoh: 170" required>
+					</div>
+					<div class="col-md-6">
+						<label class="form-label" for="bmi">BMI (otomatis)</label>
+						<input class="form-control" id="bmi" type="number" step="0.01" name="bmi"
+							value="{{ old('bmi') }}" placeholder="Otomatis" readonly required>
 					</div>
 					<div class="col-12">
 						<label class="form-label" for="smoking_status">Smoking Status</label>
@@ -169,4 +179,28 @@
 			</div>
 		</div>
 	</form>
+
+	<script>
+		const weightInput = document.getElementById('weight');
+		const heightInput = document.getElementById('height');
+		const bmiInput = document.getElementById('bmi');
+
+		const updateBmi = () => {
+			const weight = parseFloat(weightInput?.value || '0');
+			const heightCm = parseFloat(heightInput?.value || '0');
+			if (!weight || !heightCm) {
+				if (bmiInput) bmiInput.value = '';
+				return;
+			}
+			const heightM = heightCm / 100;
+			const bmi = weight / (heightM * heightM);
+			if (bmiInput && Number.isFinite(bmi)) {
+				bmiInput.value = bmi.toFixed(2);
+			}
+		};
+
+		weightInput?.addEventListener('input', updateBmi);
+		heightInput?.addEventListener('input', updateBmi);
+		window.addEventListener('DOMContentLoaded', updateBmi);
+	</script>
 @endsection

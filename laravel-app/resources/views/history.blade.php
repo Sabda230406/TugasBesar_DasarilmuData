@@ -3,17 +3,17 @@
 @section('content')
 	<style>
 		.history-hero {
-			background: linear-gradient(135deg, rgba(14, 116, 144, 0.12) 0%, rgba(14, 116, 144, 0.02) 100%);
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			background: linear-gradient(135deg, rgba(15, 118, 110, 0.14) 0%, rgba(15, 118, 110, 0.02) 100%);
+			border: 1px solid rgba(15, 118, 110, 0.18);
 			border-radius: 18px;
 			padding: 1.5rem 1.75rem;
 		}
 
 		.stat-card {
 			border-radius: 16px;
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			border: 1px solid rgba(214, 226, 234, 0.9);
 			background: #fff;
-			box-shadow: 0 16px 30px rgba(15, 23, 42, 0.06);
+			box-shadow: 0 16px 30px rgba(15, 32, 50, 0.08);
 			padding: 1.25rem;
 		}
 
@@ -31,22 +31,33 @@
 			vertical-align: middle;
 		}
 
+		.history-table th,
+		.history-table td {
+			padding: 0.9rem 1rem;
+		}
+
 		.history-table th:nth-child(1),
 		.history-table td:nth-child(1) {
+			width: 70px;
+			text-align: center;
+		}
+
+		.history-table th:nth-child(2),
+		.history-table td:nth-child(2) {
 			width: 200px;
 			text-align: center;
 			white-space: nowrap;
 		}
 
-		.history-table th:nth-child(2),
-		.history-table td:nth-child(2) {
+		.history-table th:nth-child(3),
+		.history-table td:nth-child(3) {
 			width: 180px;
 			text-align: center;
 		}
 
 		.input-card {
 			background: #f8fafc;
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			border: 1px solid rgba(214, 226, 234, 0.9);
 			border-radius: 12px;
 			padding: 0.75rem 0.9rem;
 			max-width: 520px;
@@ -60,7 +71,7 @@
 
 		.input-item {
 			background: #ffffff;
-			border: 1px solid rgba(15, 23, 42, 0.08);
+			border: 1px solid rgba(214, 226, 234, 0.9);
 			border-radius: 10px;
 			padding: 0.45rem 0.6rem;
 		}
@@ -148,6 +159,19 @@
 			color: #64748b;
 		}
 
+		.detail-btn {
+			border-radius: 999px;
+			padding: 0.45rem 0.9rem;
+			font-weight: 700;
+			font-size: 0.85rem;
+		}
+
+		.modal-input-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+			gap: 0.65rem;
+		}
+
 		.empty-state {
 			text-align: center;
 			padding: 2.5rem 1rem;
@@ -159,7 +183,7 @@
 		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
 			<div>
 				<p class="eyebrow mb-2">Riwayat Prediksi</p>
-				<h2 class="h4 fw-bold mb-2">Monitor hasil prediksi yang sudah tersimpan</h2>
+				<h2 class="h4 fw-bold mb-2"><i class="fa-solid fa-clipboard-list me-2"></i>Monitor hasil prediksi yang sudah tersimpan</h2>
 				<p class="mb-0 text-muted">Gunakan riwayat ini untuk evaluasi ulang atau kebutuhan laporan.</p>
 			</div>
 			<div class="d-flex gap-2">
@@ -173,7 +197,7 @@
 		<div class="col-md-4">
 			<div class="stat-card">
 				<p class="text-muted small mb-1">Total Riwayat</p>
-				<div class="stat-value">{{ $data->count() }}</div>
+				<div class="stat-value">{{ $data->total() }}</div>
 				<p class="mb-0 small text-muted">Prediksi tersimpan</p>
 			</div>
 		</div>
@@ -236,12 +260,16 @@
 						</select>
 					</div>
 				@endforeach
-				<div class="filter-meta">Menampilkan <span id="historyCount">{{ $data->count() }}</span> data</div>
+				<div class="filter-meta">
+					Menampilkan <span id="historyCount">{{ $data->count() }}</span>
+					data ({{ $data->firstItem() ?? 0 }}-{{ $data->lastItem() ?? 0 }} dari {{ $data->total() }})
+				</div>
 			</div>
 			<div class="table-responsive">
 				<table class="table align-middle table-borderless history-table">
 					<thead>
 						<tr>
+							<th>No</th>
 							<th>Waktu</th>
 							<th>Hasil Prediksi</th>
 							<th>Detail Input</th>
@@ -268,6 +296,7 @@
 								data-smoking_status="{{ strtolower((string) ($rowPayload['smoking_status'] ?? '')) }}"
 								data-hypertension="{{ strtolower((string) ($rowPayload['hypertension'] ?? '')) }}"
 								data-heart_disease="{{ strtolower((string) ($rowPayload['heart_disease'] ?? '')) }}">
+								<td class="fw-semibold text-muted">{{ ($data->firstItem() ?? 0) + $loop->index }}</td>
 								<td>
 									<span class="time-badge"><i class="fa-regular fa-clock"></i> {{ $displayTime }}</span>
 								</td>
@@ -278,28 +307,46 @@
 									</span>
 								</td>
 								<td>
-									<div class="input-card">
-										<span class="input-label"><i class="fa-solid fa-database"></i> Input</span>
-										@php
-											$inputPayload = json_decode($item->input_data, true);
-											$isPayloadArray = is_array($inputPayload);
-											$displayPayload = $isPayloadArray ? $inputPayload : [];
-										@endphp
-										@if($isPayloadArray)
-											<div class="input-grid">
-												@foreach($displayPayload as $key => $value)
-													<div class="input-item">
-														<div class="input-key">{{ str_replace('_', ' ', $key) }}</div>
-														<div class="input-value">{{ is_array($value) ? json_encode($value) : $value }}</div>
-													</div>
-												@endforeach
-											</div>
-										@else
-											<div class="input-value">{{ $item->input_data }}</div>
-										@endif
-									</div>
+									<button class="btn btn-outline-secondary detail-btn" type="button" data-bs-toggle="modal" data-bs-target="#detailModal{{ $item->id }}">
+										<i class="fa-solid fa-list-ul me-1"></i> Lihat Detail
+									</button>
 								</td>
 							</tr>
+							<div class="modal fade" id="detailModal{{ $item->id }}" tabindex="-1" aria-hidden="true">
+								<div class="modal-dialog modal-lg modal-dialog-centered">
+									<div class="modal-content">
+										<div class="modal-header">
+											<h5 class="modal-title"><i class="fa-solid fa-database me-2"></i>Detail Input</h5>
+											<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+										</div>
+										<div class="modal-body">
+											@php
+												$inputPayload = json_decode($item->input_data, true);
+												$isPayloadArray = is_array($inputPayload);
+												$displayPayload = $isPayloadArray ? $inputPayload : [];
+											@endphp
+											@if($isPayloadArray)
+												<div class="input-card">
+													<span class="input-label"><i class="fa-solid fa-clipboard-list me-2"></i>Input</span>
+													<div class="modal-input-grid">
+														@foreach($displayPayload as $key => $value)
+															<div class="input-item">
+																<div class="input-key">{{ str_replace('_', ' ', $key) }}</div>
+																<div class="input-value">{{ is_array($value) ? json_encode($value) : $value }}</div>
+															</div>
+														@endforeach
+													</div>
+												</div>
+											@else
+												<div class="input-value">{{ $item->input_data }}</div>
+											@endif
+										</div>
+										<div class="modal-footer">
+											<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+										</div>
+									</div>
+								</div>
+							</div>
 						@empty
 							<tr>
 								<td colspan="3">
@@ -314,6 +361,12 @@
 					</tbody>
 				</table>
 			</div>
+			@if($data->hasPages())
+				<div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
+					<div class="text-muted small">Halaman {{ $data->currentPage() }} dari {{ $data->lastPage() }}</div>
+					{{ $data->links() }}
+				</div>
+			@endif
 		</div>
 	</div>
 

@@ -75,19 +75,33 @@ class PredictionController extends Controller
 		$riskMessage = $isHighRisk
 			? 'Perlu perhatian lebih lanjut. Disarankan konsultasi dengan tenaga medis.'
 			: 'Risiko tergolong rendah. Tetap jaga pola hidup sehat.';
+		$riskTips = $isHighRisk
+			? [
+				'Jadwalkan konsultasi dengan tenaga medis untuk evaluasi lanjutan.',
+				'Pantau tekanan darah, kadar gula, dan kolesterol secara rutin.',
+				'Perbaiki pola makan: kurangi garam, gula, dan lemak jenuh.',
+				'Perbanyak aktivitas fisik ringan sesuai saran dokter.',
+			]
+			: [
+				'Kesehatanmu sudah terjaga dengan baik, pertahankan pola hidup sehat.',
+				'Tetap rutin olahraga ringan dan tidur cukup.',
+				'Pertahankan pola makan seimbang dan hidrasi yang cukup.',
+				'Lakukan pemeriksaan berkala untuk memastikan kondisi tetap stabil.',
+			];
 
 		return view('result', [
 			'prediction' => $result['prediction'],
 			'riskLabel' => $riskLabel,
 			'riskTone' => $riskTone,
 			'riskMessage' => $riskMessage,
+			'riskTips' => $riskTips,
 			'accuracy' => $result['accuracy'] ?? null,
 		]);
 	}
 
 	public function history()
 	{
-		$data = History::where('user_id', auth()->id())->latest()->get();
+		$data = History::where('user_id', auth()->id())->latest()->paginate(10);
 
 		return view('history', compact('data'));
 	}
