@@ -11,43 +11,42 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --app-bg: #f8fafc;
+            --app-bg: #f6f8fb;
             --surface: #ffffff;
-            --sidebar-bg: #0f172a;
-            --line: #e2e8f0;
-            --text-main: #1e293b;
-            --text-soft: #64748b;
-            --brand: #0284c7;
-            --brand-deep: #0369a1;
+            --surface-soft: #eef6f8;
+            --line: #dbe5ea;
+            --text-main: #102033;
+            --text-soft: #607086;
+            --brand: #0e7490;
+            --brand-deep: #155e75;
             --brand-light: #e0f2fe;
             --accent: #f59e0b;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-            --shadow-md: 0 10px 25px -5px rgba(0,0,0,0.05);
+            --success: #16a34a;
+            --shadow-sm: 0 2px 10px rgba(16, 32, 51, 0.06);
+            --shadow-md: 0 18px 45px rgba(16, 32, 51, 0.08);
             --radius-lg: 20px;
             --radius-md: 12px;
         }
 
         body {
             margin: 0;
+            min-height: 100vh;
             font-family: "Plus Jakarta Sans", sans-serif;
             color: var(--text-main);
-            background-color: var(--app-bg);
+            background:
+                linear-gradient(180deg, rgba(224, 242, 254, 0.55), rgba(246, 248, 251, 0) 360px),
+                var(--app-bg);
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Sidebar Modern - Dark Theme for Professional Look */
-        .app-sidebar {
-            width: 240px;
-            background: var(--sidebar-bg);
-            color: #fff;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.05);
-        }
-
-        .brand-section {
-            padding: 1.75rem 1.25rem 1.25rem;
+        .app-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.92);
+            border-bottom: 1px solid rgba(219, 229, 234, 0.9);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-sm);
         }
 
         .brand-mark {
@@ -57,215 +56,168 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+            background: linear-gradient(135deg, #38bdf8 0%, #0e7490 100%);
             color: #fff;
             font-weight: 800;
-            font-size: 1.2rem;
-            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.3);
+            font-size: 1.05rem;
+            box-shadow: 0 10px 22px rgba(14, 116, 144, 0.24);
         }
 
-        /* Navigation Style */
-        .app-nav {
-            padding: 0 1rem;
+        .navbar-brand {
+            color: var(--text-main);
         }
 
-        .nav-section-title {
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: #64748b;
+        .navbar-nav .nav-link {
+            border-radius: 999px;
+            color: var(--text-soft);
             font-weight: 700;
-            padding: 0 0.9rem;
-            margin-bottom: 0.75rem;
+            padding: 0.55rem 0.9rem;
         }
 
-        .nav-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 12px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.08);
-            color: #e2e8f0;
-            transition: all 0.2s ease;
+        .navbar-nav .nav-link:hover,
+        .navbar-nav .nav-link.active {
+            color: var(--brand-deep);
+            background: var(--brand-light);
         }
 
-        .app-nav .nav-link {
-            border-radius: var(--radius-md);
-            color: #94a3b8;
-            padding: 0.65rem 0.85rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .nav-auth-btn {
+            border-radius: 999px;
+            font-weight: 700;
+            padding: 0.55rem 1rem;
         }
 
-        .app-nav .nav-link:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .app-nav .nav-link:hover .nav-icon {
-            background: rgba(255, 255, 255, 0.18);
-            color: #fff;
-        }
-
-        .app-nav .nav-link.active {
-            color: #fff;
-            background: var(--brand);
-            box-shadow: 0 10px 20px -5px rgba(2, 132, 199, 0.4);
-        }
-
-        .app-nav .nav-link.active .nav-icon {
-            background: rgba(255, 255, 255, 0.2);
-            color: #fff;
-        }
-
-        /* Main Content Area */
         .app-main {
-            flex-grow: 1;
-            padding: 2rem;
-            overflow-y: auto;
-            max-height: 100vh;
+            padding: 2rem 0 3rem;
         }
 
-        /* Refined Topbar */
-        .topbar {
-            background: var(--surface);
-            border-radius: var(--radius-lg);
-            padding: 1.25rem 2rem;
-            border: 1px solid var(--line);
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: var(--shadow-sm);
-        }
-
-        /* Page Container */
         .page-frame {
             background: var(--surface);
             border-radius: var(--radius-lg);
             border: 1px solid var(--line);
-            padding: 2.5rem;
+            padding: 2.25rem;
             box-shadow: var(--shadow-md);
-            min-height: calc(100vh - 200px);
+            min-height: calc(100vh - 190px);
         }
 
-        /* Typography & Components */
         .eyebrow {
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            font-size: 0.7rem;
-            font-weight: 700;
+            font-size: 0.72rem;
+            font-weight: 800;
             color: var(--brand);
             display: block;
             margin-bottom: 0.5rem;
         }
 
         .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
             background: var(--brand-light);
             color: var(--brand-deep);
+            font-weight: 800;
+            font-size: 0.78rem;
+            padding: 0.5rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid rgba(14, 116, 144, 0.13);
+        }
+
+        .user-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid var(--line);
+            color: var(--text-main);
             font-weight: 700;
-            font-size: 0.75rem;
-            padding: 0.5rem 1rem;
-            border-radius: 100px;
-            border: 1px solid rgba(2, 132, 199, 0.1);
+            font-size: 0.88rem;
         }
 
-        .system-info-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius-md);
-            padding: 1.25rem;
-            margin-top: auto;
-            margin-bottom: 2rem;
-        }
-
-        .sidebar-meta {
-            font-size: 0.75rem;
-            color: rgba(226, 232, 240, 0.65);
-        }
-
-        /* Mobile Responsiveness */
         @media (max-width: 991.98px) {
-            .app-shell { flex-direction: column; }
-            .app-sidebar { width: 100%; min-height: auto; }
-            .app-main { padding: 1rem; }
-            .page-frame { padding: 1.5rem; }
+            .navbar-collapse {
+                padding: 1rem 0 0.4rem;
+            }
+
+            .navbar-nav .nav-link {
+                border-radius: var(--radius-md);
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .app-main {
+                padding: 1rem 0 2rem;
+            }
+
+            .page-frame {
+                padding: 1.25rem;
+                border-radius: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="app-shell d-lg-flex">
-        <aside class="app-sidebar min-vh-100">
-            <div class="brand-section">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="brand-mark">SR</div>
-                    <div>
-                        <h6 class="mb-0 fw-bold text-white">StrokeRisk</h6>
-                        <p class="mb-0 sidebar-meta">Analytics</p>
-                    </div>
+    <nav class="navbar navbar-expand-lg app-navbar">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-3 fw-bold" href="{{ url('/') }}">
+                <span class="brand-mark">SR</span>
+                <span>
+                    <span class="d-block lh-sm">StrokeRisk</span>
+                    <small class="text-muted fw-semibold">Prediction System</small>
+                </span>
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNavbar">
+                <ul class="navbar-nav mx-lg-auto gap-lg-2">
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->is('/') ? 'active' : '' }}" href="{{ url('/') }}">
+                            <i class="fa-solid fa-house-chimney me-1"></i> Landing
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('form') ? 'active' : '' }}" href="{{ route('form') }}">
+                            <i class="fa-solid fa-stethoscope me-1"></i> Prediksi
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('history') ? 'active' : '' }}" href="{{ route('history') }}">
+                            <i class="fa-solid fa-clock-rotate-left me-1"></i> Riwayat
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mt-lg-0">
+                    @auth
+                        <span class="user-pill">
+                            <i class="fa-solid fa-user"></i>
+                            {{ auth()->user()->name }}
+                        </span>
+                        <form action="{{ route('logout') }}" method="POST" class="m-0">
+                            @csrf
+                            <button class="btn btn-outline-dark nav-auth-btn" type="submit">Logout</button>
+                        </form>
+                    @else
+                        <a href="{{ route('login') }}" class="btn btn-outline-dark nav-auth-btn">Login</a>
+                        <a href="{{ route('register') }}" class="btn btn-dark nav-auth-btn">Register</a>
+                    @endauth
                 </div>
             </div>
+        </div>
+    </nav>
 
-            <div class="app-nav">
-                <p class="nav-section-title">Menu</p>
-                <nav class="nav flex-column">
-                    <a class="nav-link {{ request()->is('/') ? 'active' : '' }}" href="/">
-                        <span class="nav-icon"><i class="fa-solid fa-house-chimney"></i></span>
-                        <span class="fw-semibold">Landing</span>
-                    </a>
-                    <a class="nav-link {{ request()->is('form') ? 'active' : '' }}" href="/form">
-                        <span class="nav-icon"><i class="fa-solid fa-stethoscope"></i></span>
-                        <span class="fw-semibold">Prediksi</span>
-                    </a>
-                    <a class="nav-link {{ request()->is('history') ? 'active' : '' }}" href="/history">
-                        <span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
-                        <span class="fw-semibold">Riwayat</span>
-                    </a>
-                </nav>
+    <main class="app-main">
+        <div class="container">
+            <div class="page-frame">
+                @yield('content')
             </div>
+        </div>
+    </main>
 
-            <div class="px-3 mt-auto">
-                <div class="system-info-card">
-                    <p class="eyebrow" style="color: #38bdf8;">Kapasitas Sistem</p>
-                    <p class="small mb-0" style="color: #94a3b8; line-height: 1.6;">
-                        Menggunakan algoritma <strong>Random Forest</strong> untuk akurasi diagnosa medis yang optimal.
-                    </p>
-                </div>
-            </div>
-        </aside>
-
-        <main class="app-main">
-            <div class="container-fluid px-0">
-                <div class="topbar">
-                    <div>
-                        <p class="eyebrow">Dashboard Analytics</p>
-                        <h1 class="h4 mb-0 fw-bold text-dark">Sistem Klasifikasi Risiko Stroke</h1>
-                    </div>
-                    
-                    <div class="d-flex align-items-center gap-4">
-                        <div class="text-end d-none d-md-block border-end pe-4">
-                            <div class="small fw-bold">Model Stat</div>
-                            <div class="small text-muted">RF Classifier v1.2</div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="status-badge">
-                                <i class="fa-solid fa-circle-check me-1"></i> Akurasi 95%
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="page-frame">
-                    @yield('content')
-                </div>
-            </div>
-        </main>
-    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

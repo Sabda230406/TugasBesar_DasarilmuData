@@ -64,6 +64,7 @@ class PredictionController extends Controller
 		}
 
 		History::create([
+			'user_id' => $request->user()->id,
 			'input_data' => json_encode($input),
 			'prediction' => $result['prediction'],
 		]);
@@ -86,7 +87,7 @@ class PredictionController extends Controller
 
 	public function history()
 	{
-		$data = History::latest()->get();
+		$data = History::where('user_id', auth()->id())->latest()->get();
 
 		return view('history', compact('data'));
 	}
