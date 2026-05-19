@@ -441,14 +441,14 @@
                 <div class="col-md-4">
                     <div class="team-card">
                         <div class="team-avatar mb-3">02</div>
-                        <h3 class="h5 fw-bold mb-1">Viona Deva Q.</h3>
+                        <h3 class="h5 fw-bold mb-1">Viona Deva Qaulika</h3>
                         <p class="soft-copy mb-0">Machine Learning & Dataset</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="team-card">
                         <div class="team-avatar mb-3">03</div>
-                        <h3 class="h5 fw-bold mb-1">Sabda Putra A.</h3>
+                        <h3 class="h5 fw-bold mb-1">Sabda Putra Aribawa</h3>
                         <p class="soft-copy mb-0">UI Design & Dokumentasi</p>
                     </div>
                 </div>
