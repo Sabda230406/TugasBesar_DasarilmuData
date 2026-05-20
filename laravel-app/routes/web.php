@@ -16,6 +16,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/form', [PredictionController::class, 'index'])->name('form');
     Route::post('/predict', [PredictionController::class, 'predict'])->name('predict');
+    Route::get('/upload', [PredictionController::class, 'upload'])->name('upload');
+    Route::post('/upload/predict', [PredictionController::class, 'predictUpload'])->name('upload.predict');
     Route::get('/history', [PredictionController::class, 'history'])->name('history');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

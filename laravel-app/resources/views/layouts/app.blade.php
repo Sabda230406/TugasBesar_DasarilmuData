@@ -201,6 +201,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('upload') || request()->routeIs('upload.predict') ? 'active' : '' }}" href="{{ route('upload') }}">
+                            <i class="fa-solid fa-file-arrow-up me-1"></i> Upload File
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('history') ? 'active' : '' }}" href="{{ route('history') }}">
                             <i class="fa-solid fa-clock-rotate-left me-1"></i> Riwayat
                         </a>
