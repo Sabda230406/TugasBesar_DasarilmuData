@@ -7,6 +7,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import pandas as pd
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
@@ -119,20 +120,46 @@ def encode_numeric(column, value):
 	return numeric_value
 
 
-def prepare_features(raw_input):
+def validate_and_normalize_input(raw_input):
 	missing_columns = [
 		column for column in feature_columns if column not in raw_input or is_missing(raw_input[column])
 	]
 	if missing_columns:
 		raise ValueError(f"Kolom yang hilang: {', '.join(missing_columns)}")
 
-	ordered_values = []
+	normalized = {}
 	for column in feature_columns:
 		value = raw_input[column]
 		if column in CATEGORY_MAPS:
+			if isinstance(value, str):
+				value = value.strip()
+			if value not in CATEGORY_MAPS[column]:
+				allowed_values = ", ".join(CATEGORY_MAPS[column].keys())
+				raise ValueError(f"{column} harus salah satu dari: {allowed_values}")
+			normalized[column] = value
+		else:
+			normalized[column] = encode_numeric(column, value)
+
+	return normalized
+
+
+def model_uses_pipeline():
+	return hasattr(model, "named_steps")
+
+
+def prepare_features(raw_input):
+	normalized = validate_and_normalize_input(raw_input)
+
+	if model_uses_pipeline():
+		return pd.DataFrame([normalized], columns=feature_columns)
+
+	ordered_values = []
+	for column in feature_columns:
+		value = normalized[column]
+		if column in CATEGORY_MAPS:
 			ordered_values.append(encode_categorical(column, value))
 		else:
-			ordered_values.append(encode_numeric(column, value))
+			ordered_values.append(value)
 
 	return np.array(ordered_values, dtype=float).reshape(1, -1)
 
@@ -226,7 +253,10 @@ def predict():
 			"accuracy": model_metrics.get("accuracy"),
 		}
 		if data.get("debug"):
-			response["encoded_features"] = dict(zip(feature_columns, features[0].tolist()))
+			if isinstance(features, pd.DataFrame):
+				response["model_input"] = features.iloc[0].to_dict()
+			else:
+				response["encoded_features"] = dict(zip(feature_columns, features[0].tolist()))
 
 		return jsonify(response)
 	except (TypeError, ValueError) as exc:
