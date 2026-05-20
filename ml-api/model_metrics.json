@@ -12,48 +12,49 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.8990610328638498,
+    "accuracy": 0.6619718309859155,
     "classification_report": {
         "0": {
-            "precision": 0.9586497890295359,
-            "recall": 0.9342105263157895,
-            "f1-score": 0.9462723865056226,
+            "precision": 0.9839506172839506,
+            "recall": 0.6554276315789473,
+            "f1-score": 0.786771964461994,
             "support": 1216.0
         },
         "1": {
-            "precision": 0.13978494623655913,
-            "recall": 0.20967741935483872,
-            "f1-score": 0.16774193548387098,
+            "precision": 0.1047008547008547,
+            "recall": 0.7903225806451613,
+            "f1-score": 0.18490566037735848,
             "support": 62.0
         },
-        "accuracy": 0.8990610328638498,
+        "accuracy": 0.6619718309859155,
         "macro avg": {
-            "precision": 0.5492173676330475,
-            "recall": 0.5719439728353141,
-            "f1-score": 0.5570071609947468,
+            "precision": 0.5443257359924026,
+            "recall": 0.7228751061120543,
+            "f1-score": 0.48583881241967625,
             "support": 1278.0
         },
         "weighted avg": {
-            "precision": 0.9189239515857451,
-            "recall": 0.8990610328638498,
-            "f1-score": 0.9085033035922043,
+            "precision": 0.9412953079880569,
+            "recall": 0.6619718309859155,
+            "f1-score": 0.7575734426675907,
             "support": 1278.0
         }
     },
     "confusion_matrix": [
         [
-            1136,
-            80
+            797,
+            419
         ],
         [
-            49,
-            13
+            13,
+            49
         ]
     ],
     "best_params": {
-        "model__criterion": "entropy",
-        "model__max_depth": null,
-        "model__min_samples_leaf": 4,
+        "model__class_weight": null,
+        "model__criterion": "gini",
+        "model__max_depth": 5,
+        "model__min_samples_leaf": 1,
         "model__min_samples_split": 2
     },
     "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
