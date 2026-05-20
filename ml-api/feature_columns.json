@@ -1,6 +1,5 @@
 {
     "feature_columns": [
-        "id",
         "gender",
         "age",
         "hypertension",
