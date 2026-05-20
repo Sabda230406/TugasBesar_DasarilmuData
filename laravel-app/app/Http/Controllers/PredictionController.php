@@ -92,7 +92,8 @@ class PredictionController extends Controller
 			];
 
 		$modelMetrics = $this->modelMetrics();
-		$accuracy = $result['accuracy'] ?? $modelMetrics['accuracy'] ?? null;
+		$accuracy = $modelMetrics['accuracy'] ?? $result['accuracy'] ?? null;
+		$modelName = $modelMetrics['model_name'] ?? $result['model_name'] ?? 'Decision Tree';
 
 		return view('result', [
 			'prediction' => $result['prediction'],
@@ -102,7 +103,7 @@ class PredictionController extends Controller
 			'riskTips' => $riskTips,
 			'accuracy' => $accuracy,
 			'accuracyDisplay' => $this->formatAccuracy($accuracy),
-			'modelName' => $result['model_name'] ?? $modelMetrics['model_name'] ?? 'Decision Tree',
+			'modelName' => $modelName,
 		]);
 	}
 

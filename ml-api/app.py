@@ -77,6 +77,10 @@ def load_model_metrics():
 	return payload
 
 
+def file_mtime(path):
+	return path.stat().st_mtime if path.exists() else None
+
+
 def is_missing(value):
 	if value is None:
 		return True
@@ -136,6 +140,41 @@ def prepare_features(raw_input):
 model = load_model()
 feature_columns = load_feature_columns()
 model_metrics = load_model_metrics()
+model_mtime = file_mtime(MODEL_PATH)
+features_mtime = file_mtime(FEATURES_PATH)
+metrics_mtime = file_mtime(METRICS_PATH)
+
+
+def refresh_runtime_state():
+	global model, feature_columns, model_metrics
+	global model_mtime, features_mtime, metrics_mtime
+
+	current_model_mtime = file_mtime(MODEL_PATH)
+	if current_model_mtime != model_mtime:
+		model = load_model()
+		model_mtime = current_model_mtime
+
+	current_features_mtime = file_mtime(FEATURES_PATH)
+	if current_features_mtime != features_mtime:
+		feature_columns = load_feature_columns()
+		features_mtime = current_features_mtime
+
+	current_metrics_mtime = file_mtime(METRICS_PATH)
+	if current_metrics_mtime != metrics_mtime:
+		model_metrics = load_model_metrics()
+		metrics_mtime = current_metrics_mtime
+
+
+def predict_high_risk_probability(features):
+	if not hasattr(model, "predict_proba") or not hasattr(model, "classes_"):
+		return None
+
+	classes = list(model.classes_)
+	if 1 not in classes:
+		return None
+
+	probabilities = model.predict_proba(features)[0]
+	return float(probabilities[classes.index(1)])
 
 
 @app.route("/health", methods=["GET"])
@@ -145,10 +184,13 @@ def health():
 
 @app.route("/metadata", methods=["GET"])
 def metadata():
+	refresh_runtime_state()
+
 	return jsonify(
 		{
 			"status": "success",
 			"model_name": model_metrics.get("model_name", "Decision Tree"),
+			"model_type": type(model).__name__,
 			"accuracy": model_metrics.get("accuracy"),
 			"best_params": model_metrics.get("best_params"),
 			"hpo_method": model_metrics.get("hpo_method"),
@@ -158,9 +200,10 @@ def metadata():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-	data = request.get_json(silent=True) or {}
-
 	try:
+		refresh_runtime_state()
+		data = request.get_json(silent=True) or {}
+
 		if "input" not in data:
 			return jsonify({"status": "error", "message": "Missing 'input' in JSON."}), 400
 
@@ -173,15 +216,19 @@ def predict():
 
 		features = prepare_features(raw_input)
 		prediction = model.predict(features)
+		high_risk_probability = predict_high_risk_probability(features)
 
-		return jsonify(
-			{
-				"status": "success",
-				"prediction": int(prediction[0]),
-				"model_name": model_metrics.get("model_name", "Decision Tree"),
-				"accuracy": model_metrics.get("accuracy"),
-			}
-		)
+		response = {
+			"status": "success",
+			"prediction": int(prediction[0]),
+			"high_risk_probability": high_risk_probability,
+			"model_name": model_metrics.get("model_name", "Decision Tree"),
+			"accuracy": model_metrics.get("accuracy"),
+		}
+		if data.get("debug"):
+			response["encoded_features"] = dict(zip(feature_columns, features[0].tolist()))
+
+		return jsonify(response)
 	except (TypeError, ValueError) as exc:
 		return jsonify({"status": "error", "message": str(exc)}), 400
 	except Exception as exc:  # pylint: disable=broad-except
