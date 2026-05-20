@@ -12,50 +12,50 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.918859649122807,
+    "accuracy": 0.8990610328638498,
     "classification_report": {
         "0": {
-            "precision": 0.9362186788154897,
-            "recall": 0.899343544857768,
-            "f1-score": 0.9174107142857143,
-            "support": 914.0
+            "precision": 0.9586497890295359,
+            "recall": 0.9342105263157895,
+            "f1-score": 0.9462723865056226,
+            "support": 1216.0
         },
         "1": {
-            "precision": 0.9027484143763214,
-            "recall": 0.9384615384615385,
-            "f1-score": 0.9202586206896551,
-            "support": 910.0
+            "precision": 0.13978494623655913,
+            "recall": 0.20967741935483872,
+            "f1-score": 0.16774193548387098,
+            "support": 62.0
         },
-        "accuracy": 0.918859649122807,
+        "accuracy": 0.8990610328638498,
         "macro avg": {
-            "precision": 0.9194835465959055,
-            "recall": 0.9189025416596532,
-            "f1-score": 0.9188346674876847,
-            "support": 1824.0
+            "precision": 0.5492173676330475,
+            "recall": 0.5719439728353141,
+            "f1-score": 0.5570071609947468,
+            "support": 1278.0
         },
         "weighted avg": {
-            "precision": 0.9195202464472643,
-            "recall": 0.918859649122807,
-            "f1-score": 0.9188315447832945,
-            "support": 1824.0
+            "precision": 0.9189239515857451,
+            "recall": 0.8990610328638498,
+            "f1-score": 0.9085033035922043,
+            "support": 1278.0
         }
     },
     "confusion_matrix": [
         [
-            822,
-            92
+            1136,
+            80
         ],
         [
-            56,
-            854
+            49,
+            13
         ]
     ],
     "best_params": {
-        "criterion": "entropy",
-        "max_depth": null,
-        "min_samples_leaf": 1,
-        "min_samples_split": 2
+        "model__criterion": "entropy",
+        "model__max_depth": null,
+        "model__min_samples_leaf": 4,
+        "model__min_samples_split": 2
     },
-    "hpo_method": "GridSearchCV",
+    "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
     "random_state": 42
 }

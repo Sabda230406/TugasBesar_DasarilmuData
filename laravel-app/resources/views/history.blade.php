@@ -366,7 +366,7 @@
 			@if($data->hasPages())
 				<div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
 					<div class="text-muted small">Halaman {{ $data->currentPage() }} dari {{ $data->lastPage() }}</div>
-					{{ $data->links() }}
+					{{ $data->links('pagination::bootstrap-5') }}
 				</div>
 			@endif
 		</div>
