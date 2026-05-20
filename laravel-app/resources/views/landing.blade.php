@@ -1,6 +1,11 @@
 @extends('layouts.app')
 
 @section('content')
+    @php
+        $modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
+        $accuracyDisplay = $modelMetrics['accuracy_display'] ?? '91.89%';
+    @endphp
+
     <style>
         .landing-shell {
             display: grid;
@@ -261,11 +266,11 @@
                             </div>
                             <div class="hero-list-item">
                                 <span>Model</span>
-                                <span>Random Forest</span>
+                                <span>{{ $modelName }}</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Akurasi</span>
-                                <span>95%</span>
+                                <span>{{ $accuracyDisplay }}</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Output</span>
@@ -331,14 +336,14 @@
             <div class="col-md-4">
                 <div class="model-card">
                     <p class="section-kicker">Model</p>
-                    <h3 class="h5 fw-bold mb-2">Random Forest Classifier</h3>
+                    <h3 class="h5 fw-bold mb-2">{{ $modelName }} Classifier</h3>
                     <p class="soft-copy mb-0">Model machine learning yang digunakan untuk klasifikasi risiko stroke dari fitur input pasien.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="model-card">
                     <p class="section-kicker">Accuracy</p>
-                    <div class="metric-value mb-2">95%</div>
+                    <div class="metric-value mb-2">{{ $accuracyDisplay }}</div>
                     <p class="soft-copy mb-0">Nilai akurasi model yang dikirim dari layanan Flask ML API saat prediksi dilakukan.</p>
                 </div>
             </div>

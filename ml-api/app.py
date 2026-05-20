@@ -14,6 +14,7 @@ app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = Path(os.getenv("MODEL_PATH", BASE_DIR / "model.pkl"))
 FEATURES_PATH = Path(os.getenv("FEATURES_PATH", BASE_DIR / "feature_columns.json"))
+METRICS_PATH = Path(os.getenv("METRICS_PATH", BASE_DIR / "model_metrics.json"))
 
 CATEGORY_MAPS = {
 	"gender": {"Male": 1, "Female": 0, "Other": 2},
@@ -61,6 +62,19 @@ def load_feature_columns():
 	if not isinstance(columns, list):
 		raise ValueError("feature_columns.json must be a list or {feature_columns: [...]}.")
 	return columns
+
+
+def load_model_metrics():
+	if not METRICS_PATH.exists():
+		return {"model_name": "Decision Tree", "accuracy": None}
+
+	with open(METRICS_PATH, "r", encoding="utf-8") as file:
+		payload = json.load(file)
+
+	if not isinstance(payload, dict):
+		raise ValueError("model_metrics.json must be a JSON object.")
+
+	return payload
 
 
 def is_missing(value):
@@ -121,11 +135,25 @@ def prepare_features(raw_input):
 
 model = load_model()
 feature_columns = load_feature_columns()
+model_metrics = load_model_metrics()
 
 
 @app.route("/health", methods=["GET"])
 def health():
 	return jsonify({"status": "ok"})
+
+
+@app.route("/metadata", methods=["GET"])
+def metadata():
+	return jsonify(
+		{
+			"status": "success",
+			"model_name": model_metrics.get("model_name", "Decision Tree"),
+			"accuracy": model_metrics.get("accuracy"),
+			"best_params": model_metrics.get("best_params"),
+			"hpo_method": model_metrics.get("hpo_method"),
+		}
+	)
 
 
 @app.route("/predict", methods=["POST"])
@@ -150,7 +178,8 @@ def predict():
 			{
 				"status": "success",
 				"prediction": int(prediction[0]),
-				"accuracy": 0.95,
+				"model_name": model_metrics.get("model_name", "Decision Tree"),
+				"accuracy": model_metrics.get("accuracy"),
 			}
 		)
 	except (TypeError, ValueError) as exc:

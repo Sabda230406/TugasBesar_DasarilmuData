@@ -10,7 +10,9 @@ class PredictionController extends Controller
 {
 	public function landing()
 	{
-		return view('landing');
+		return view('landing', [
+			'modelMetrics' => $this->modelMetrics(),
+		]);
 	}
 
 	public function index()
@@ -89,13 +91,18 @@ class PredictionController extends Controller
 				'Lakukan pemeriksaan berkala untuk memastikan kondisi tetap stabil.',
 			];
 
+		$modelMetrics = $this->modelMetrics();
+		$accuracy = $result['accuracy'] ?? $modelMetrics['accuracy'] ?? null;
+
 		return view('result', [
 			'prediction' => $result['prediction'],
 			'riskLabel' => $riskLabel,
 			'riskTone' => $riskTone,
 			'riskMessage' => $riskMessage,
 			'riskTips' => $riskTips,
-			'accuracy' => $result['accuracy'] ?? null,
+			'accuracy' => $accuracy,
+			'accuracyDisplay' => $this->formatAccuracy($accuracy),
+			'modelName' => $result['model_name'] ?? $modelMetrics['model_name'] ?? 'Decision Tree',
 		]);
 	}
 
@@ -104,5 +111,44 @@ class PredictionController extends Controller
 		$data = History::where('user_id', auth()->id())->latest()->paginate(10);
 
 		return view('history', compact('data'));
+	}
+
+	private function modelMetrics(): array
+	{
+		$defaults = [
+			'model_name' => 'Decision Tree',
+			'accuracy' => null,
+			'accuracy_display' => null,
+		];
+		$path = dirname(base_path()) . DIRECTORY_SEPARATOR . 'ml-api' . DIRECTORY_SEPARATOR . 'model_metrics.json';
+
+		if (! is_file($path)) {
+			return $defaults;
+		}
+
+		$metrics = json_decode((string) file_get_contents($path), true);
+		if (! is_array($metrics)) {
+			return $defaults;
+		}
+
+		$accuracy = $metrics['accuracy'] ?? null;
+		$metrics['model_name'] = $metrics['model_name'] ?? $defaults['model_name'];
+		$metrics['accuracy_display'] = $this->formatAccuracy($accuracy);
+
+		return array_merge($defaults, $metrics);
+	}
+
+	private function formatAccuracy($accuracy): ?string
+	{
+		if (! is_numeric($accuracy)) {
+			return null;
+		}
+
+		$value = (float) $accuracy;
+		if ($value <= 1) {
+			$value *= 100;
+		}
+
+		return number_format($value, 2) . '%';
 	}
 }

@@ -68,8 +68,8 @@
 					<i class="fa-solid {{ $riskTone === 'high' ? 'fa-triangle-exclamation' : 'fa-circle-check' }}"></i>
 					{{ $riskLabel }}
 				</span>
-				@if($accuracy)
-					<span class="text-muted">Akurasi model: {{ $accuracy }}</span>
+				@if($accuracyDisplay)
+					<span class="text-muted">Akurasi {{ $modelName ?? 'Decision Tree' }}: {{ $accuracyDisplay }}</span>
 				@endif
 			</div>
 			<p class="text-muted mb-4">{{ $riskMessage }}</p>
