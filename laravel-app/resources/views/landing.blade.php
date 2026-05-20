@@ -244,7 +244,7 @@
                         </span>
                         <h1 class="display-5 fw-bold mb-3">
                             <i class="fa-solid fa-shield-heart me-2"></i>
-                            Deteksi Risiko Stroke Berbasis Machine Learning
+                            Sistem Cerdas Prediksi Risiko Stroke Berbasis Machine Learning Berdasarkan Faktor Gaya Hidup dan Riwayat Kesehatan
                         </h1>
                         <p class="lead text-white-50 mb-4">
                             Web ini membantu mengklasifikasikan potensi risiko stroke berdasarkan data kesehatan,
