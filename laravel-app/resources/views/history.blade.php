@@ -282,7 +282,9 @@
 								$predictionLabel = $isHighRisk ? 'Risiko Tinggi' : 'Risiko Rendah';
 								$predictionIcon = $isHighRisk ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
 								$predictionClass = $isHighRisk ? 'high' : '';
-								$displayTime = $item->created_at?->format('d M Y, H:i') ?? $item->created_at;
+								$displayTime = $item->created_at
+									? $item->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') 
+									: $item->created_at;
 								$rowPayload = json_decode($item->input_data, true);
 							@endphp
 							<tr class="history-row"
