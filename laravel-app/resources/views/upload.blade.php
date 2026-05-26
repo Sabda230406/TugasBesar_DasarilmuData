@@ -3,57 +3,167 @@
 @section('content')
 	@php
 		$modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
-		$accuracyDisplay = $modelMetrics['accuracy_display'] ?? null;
 	@endphp
 
 	<style>
 		.upload-hero {
-			display: grid;
-			grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-			gap: 1.5rem;
-			align-items: stretch;
-			margin-bottom: 1.5rem;
+			background: linear-gradient(135deg, rgba(15, 118, 110, 0.14) 0%, rgba(15, 118, 110, 0.02) 100%);
+			border: 1px solid rgba(15, 118, 110, 0.18);
+			border-radius: 18px;
+			padding: 1.5rem 1.75rem;
 		}
 
-		.upload-panel,
-		.format-panel,
-		.help-panel {
-			border: 1px solid rgba(214, 226, 234, 0.95);
-			border-radius: 20px;
+		.upload-card {
+			border-radius: 18px;
+			border: 1px solid rgba(214, 226, 234, 0.9);
 			background: #fff;
-			box-shadow: 0 18px 40px rgba(15, 32, 50, 0.08);
+			box-shadow: 0 16px 32px rgba(15, 32, 50, 0.08);
+			padding: 1.5rem;
 		}
 
-		.upload-panel {
-			padding: 1.75rem;
+		.form-section-title {
+			font-weight: 700;
+			color: #0f172a;
+			margin-bottom: 0.75rem;
 		}
 
-		.model-mini-card {
-			padding: 1.25rem;
-			background: linear-gradient(135deg, rgba(223, 247, 242, 0.9), rgba(255, 255, 255, 0.95));
+		.form-helper {
+			color: #64748b;
+			font-size: 0.85rem;
+		}
+
+		.model-picker {
+			border: 1px solid rgba(15, 118, 110, 0.18);
+			border-radius: 16px;
+			background: #ffffff;
+			padding: 1rem;
+			box-shadow: 0 14px 28px rgba(15, 32, 50, 0.06);
+		}
+
+		.model-options {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.75rem;
+			margin-top: 0.85rem;
+		}
+
+		.model-option {
+			position: relative;
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr);
+			gap: 0.75rem;
+			align-items: center;
+			min-height: 92px;
+			border: 1px solid rgba(148, 163, 184, 0.32);
+			border-radius: 14px;
+			background: #f8fafc;
+			padding: 0.95rem;
+			transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+		}
+
+		.model-option input {
+			position: absolute;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.model-option.is-active {
+			border-color: rgba(15, 118, 110, 0.48);
+			background: linear-gradient(135deg, rgba(223, 247, 242, 0.9), #ffffff);
+			box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
+		}
+
+		.model-option.is-disabled {
+			cursor: not-allowed;
+			opacity: 0.74;
+		}
+
+		.model-option-icon {
+			width: 42px;
+			height: 42px;
+			border-radius: 12px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+		}
+
+		.model-option.is-disabled .model-option-icon {
+			background: rgba(148, 163, 184, 0.16);
+			color: #64748b;
+		}
+
+		.model-option-title,
+		.model-option-meta {
+			display: block;
+		}
+
+		.model-option-title {
+			font-weight: 800;
+			color: #0f172a;
+		}
+
+		.model-option-meta {
+			color: #64748b;
+			font-size: 0.78rem;
+			font-weight: 700;
+		}
+
+		.model-option-badge {
+			grid-column: 1 / -1;
+			width: fit-content;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-size: 0.72rem;
+			font-weight: 800;
+			padding: 0.3rem 0.55rem;
+		}
+
+		.model-option.is-disabled .model-option-badge {
+			background: rgba(245, 158, 11, 0.14);
+			color: #92400e;
+		}
+
+		.model-note {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+			border-radius: 999px;
+			background: rgba(245, 158, 11, 0.14);
+			color: #92400e;
+			font-size: 0.78rem;
+			font-weight: 800;
+			padding: 0.45rem 0.7rem;
+		}
+
+		.upload-card-head {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 1rem;
+			margin-bottom: 1.25rem;
 		}
 
 		.dropzone {
 			position: relative;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			min-height: 260px;
+			display: grid;
+			place-items: center;
+			min-height: 250px;
 			padding: 2rem;
-			border: 2px dashed rgba(15, 118, 110, 0.32);
-			border-radius: 18px;
+			border: 2px dashed rgba(15, 118, 110, 0.34);
+			border-radius: 16px;
 			background:
-				linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(245, 158, 11, 0.06)),
+				linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(245, 158, 11, 0.05)),
 				#fbfefd;
 			text-align: center;
-			transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+			transition: border-color 0.2s ease, background 0.2s ease;
 		}
 
 		.dropzone.is-dragover {
 			border-color: #0f766e;
-			transform: translateY(-2px);
-			background: rgba(223, 247, 242, 0.9);
+			background: rgba(223, 247, 242, 0.82);
 		}
 
 		.dropzone input {
@@ -64,16 +174,16 @@
 		}
 
 		.upload-icon {
-			width: 72px;
-			height: 72px;
+			width: 64px;
+			height: 64px;
 			display: inline-flex;
 			align-items: center;
 			justify-content: center;
-			border-radius: 18px;
+			border-radius: 16px;
 			background: #0f766e;
 			color: #fff;
-			font-size: 1.75rem;
-			box-shadow: 0 18px 32px rgba(15, 118, 110, 0.24);
+			font-size: 1.55rem;
+			box-shadow: 0 14px 26px rgba(15, 118, 110, 0.22);
 			margin-bottom: 1rem;
 		}
 
@@ -84,8 +194,8 @@
 			border-radius: 999px;
 			background: #eff6ff;
 			color: #1d4ed8;
-			font-weight: 700;
-			font-size: 0.88rem;
+			font-weight: 800;
+			font-size: 0.86rem;
 		}
 
 		.file-name-pill.is-visible {
@@ -94,138 +204,198 @@
 			gap: 0.45rem;
 		}
 
-		.format-panel {
-			padding: 1.25rem;
+		.upload-rules {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.55rem;
+			margin-top: 1rem;
 		}
 
-		.column-grid {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 0.65rem;
+		.rule-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			border-radius: 999px;
+			background: #f8fafc;
+			border: 1px solid rgba(148, 163, 184, 0.22);
+			color: #0f766e;
+			font-size: 0.82rem;
+			font-weight: 800;
+			padding: 0.45rem 0.7rem;
+		}
+
+		.rule-pill span {
+			color: #475569;
+		}
+
+		.column-list {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.45rem;
+		}
+
+		.required-block {
+			margin-top: 1.25rem;
+			padding-top: 1.25rem;
+			border-top: 1px solid rgba(148, 163, 184, 0.2);
 		}
 
 		.column-chip {
-			border: 1px solid rgba(148, 163, 184, 0.25);
-			border-radius: 12px;
+			border: 1px solid rgba(148, 163, 184, 0.22);
+			border-radius: 999px;
 			background: #f8fafc;
-			padding: 0.55rem 0.7rem;
-			font-size: 0.82rem;
-			font-weight: 700;
+			padding: 0.35rem 0.6rem;
+			font-size: 0.78rem;
+			font-weight: 800;
 			color: #334155;
 			overflow-wrap: anywhere;
 		}
 
-		.example-box {
-			border-radius: 14px;
-			background: #0f172a;
-			color: #dbeafe;
-			padding: 1rem;
-			font-size: 0.8rem;
-			overflow-x: auto;
-			margin: 0;
+		.upload-footer {
+			border-top: 1px solid rgba(148, 163, 184, 0.2);
+			padding-top: 1.25rem;
 		}
 
-		@media (max-width: 991.98px) {
-			.upload-hero {
-				grid-template-columns: 1fr;
+		@media (max-width: 767.98px) {
+			.upload-card-head {
+				flex-direction: column;
 			}
-		}
 
-		@media (max-width: 575.98px) {
-			.column-grid {
+			.model-options {
 				grid-template-columns: 1fr;
 			}
 
 			.dropzone {
-				min-height: 220px;
+				min-height: 240px;
 				padding: 1.25rem;
 			}
 		}
 	</style>
 
-	<div class="upload-hero">
-		<div class="upload-panel">
-			<p class="eyebrow">Prediksi Batch</p>
-			<h1 class="h3 fw-bold mb-2"><i class="fa-solid fa-file-medical me-2"></i>Upload CSV atau Excel pasien</h1>
-			<p class="text-muted mb-4">Unggah data banyak pasien sekaligus. Baris yang valid akan diprediksi dan tersimpan ke riwayat akun Anda.</p>
+	<div class="upload-hero mb-4">
+		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+			<div>
+				<p class="eyebrow mb-2">Prediksi Batch</p>
+				<h1 class="h4 fw-bold mb-2"><i class="fa-solid fa-file-arrow-up me-2"></i>Upload data pasien untuk prediksi risiko stroke.</h1>
+				<p class="mb-0 text-muted">Gunakan file CSV, XLSX, atau XLS untuk memproses banyak pasien sekaligus.</p>
+			</div>
+			<div class="text-end">
+				<span class="status-badge"><i class="fa-solid fa-tree me-1"></i>{{ $modelName }} Aktif</span>
+			</div>
+		</div>
+	</div>
 
-			@if ($errors->any())
-				<div class="alert alert-danger">
-					<ul class="mb-0">
-						@foreach ($errors->all() as $error)
-							<li>{{ $error }}</li>
-						@endforeach
-					</ul>
+	@if ($errors->any())
+		<div class="alert alert-danger">
+			<ul class="mb-0">
+				@foreach ($errors->all() as $error)
+					<li>{{ $error }}</li>
+				@endforeach
+			</ul>
+		</div>
+	@endif
+
+	<form action="{{ route('upload.predict') }}" method="POST" enctype="multipart/form-data" class="row g-4">
+		@csrf
+
+		<div class="col-12">
+			<div class="model-picker">
+				<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+					<div>
+						<div class="form-label fw-bold mb-1">Pilih Model Prediksi</div>
+						<div class="form-helper">Model tambahan sudah muncul di tampilan, tapi belum aktif untuk prediksi.</div>
+					</div>
+					<span class="model-note">
+						<i class="fa-solid fa-circle-info"></i>
+						Prediksi saat ini masih memakai Decision Tree.
+					</span>
 				</div>
-			@endif
+				<div class="model-options" role="radiogroup" aria-label="Pilih Model Prediksi">
+					<label class="model-option is-active" for="upload_model_decision_tree">
+						<input id="upload_model_decision_tree" type="radio" name="model" value="decision_tree" checked>
+						<span class="model-option-icon"><i class="fa-solid fa-tree"></i></span>
+						<span>
+							<span class="model-option-title">Decision Tree</span>
+							<span class="model-option-meta">Model aktif sekarang</span>
+						</span>
+						<span class="model-option-badge">Aktif</span>
+					</label>
+					<label class="model-option is-disabled" for="upload_model_knn">
+						<input id="upload_model_knn" type="radio" name="model" value="knn" disabled>
+						<span class="model-option-icon"><i class="fa-solid fa-diagram-project"></i></span>
+						<span>
+							<span class="model-option-title">KNN</span>
+							<span class="model-option-meta">Belum ada artefak model</span>
+						</span>
+						<span class="model-option-badge">Belum aktif</span>
+					</label>
+					<label class="model-option is-disabled" for="upload_model_svm">
+						<input id="upload_model_svm" type="radio" name="model" value="svm" disabled>
+						<span class="model-option-icon"><i class="fa-solid fa-vector-square"></i></span>
+						<span>
+							<span class="model-option-title">SVM</span>
+							<span class="model-option-meta">Belum ada artefak model</span>
+						</span>
+						<span class="model-option-badge">Belum aktif</span>
+					</label>
+				</div>
+			</div>
+		</div>
 
-			<form action="{{ route('upload.predict') }}" method="POST" enctype="multipart/form-data">
-				@csrf
+		<div class="col-12">
+			<div class="upload-card">
+				<div class="upload-card-head">
+					<div>
+						<h6 class="form-section-title"><i class="fa-solid fa-file-arrow-up me-2"></i>File Data Pasien</h6>
+						<p class="form-helper mb-0">Upload file dengan header yang sesuai supaya data bisa diproses tanpa input manual satu per satu.</p>
+					</div>
+					<a href="{{ asset('templates/stroke-input-template.csv') }}" class="btn btn-outline-secondary" download>
+						<i class="fa-solid fa-file-csv me-2"></i>Download Template
+					</a>
+				</div>
+
 				<label class="dropzone" id="dropzone">
 					<input id="prediction_file" type="file" name="prediction_file" accept=".csv,.txt,.xlsx,.xls" required>
-					<span class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
-					<span class="h5 fw-bold mb-2">Pilih file atau tarik ke sini</span>
-					<span class="text-muted">Format: CSV, XLSX, atau XLS. Maksimal 5 MB dan 500 baris.</span>
-					<span class="file-name-pill" id="fileName">
-						<i class="fa-solid fa-file-lines"></i>
-						<span></span>
+					<span>
+						<span class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+						<span class="h5 fw-bold d-block mb-2">Pilih file atau tarik ke sini</span>
+						<span class="text-muted d-block">File akan divalidasi sebelum diproses.</span>
+						<span class="file-name-pill" id="fileName">
+							<i class="fa-solid fa-file-lines"></i>
+							<span></span>
+						</span>
 					</span>
 				</label>
 
-				<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
-					<div class="text-muted small">
-						<i class="fa-solid fa-shield-heart me-1"></i>
-						Pastikan header file sesuai kolom model.
+				<div class="upload-rules">
+					<span class="rule-pill"><i class="fa-solid fa-file-lines"></i><span>CSV, XLSX, atau XLS</span></span>
+					<span class="rule-pill"><i class="fa-solid fa-weight-scale"></i><span>Maksimal 5 MB</span></span>
+					<span class="rule-pill"><i class="fa-solid fa-table-list"></i><span>Maksimal 500 baris</span></span>
+				</div>
+
+				<div class="required-block">
+					<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+						<h6 class="form-section-title mb-0"><i class="fa-solid fa-table-columns me-2"></i>Header Wajib</h6>
+						<span class="form-helper">Template CSV sudah berisi semua header ini.</span>
 					</div>
-					<button type="submit" class="btn btn-dark btn-lg px-4">
-						<i class="fa-solid fa-wand-magic-sparkles me-2"></i>Proses Prediksi
-					</button>
+					<div class="column-list">
+						@foreach($requiredColumns as $column)
+							<span class="column-chip">{{ $column }}</span>
+						@endforeach
+					</div>
 				</div>
-			</form>
-		</div>
 
-		<div class="model-mini-card upload-panel">
-			<p class="eyebrow">Model Aktif</p>
-			<h2 class="h5 fw-bold mb-3">{{ $modelName }}</h2>
-			<div class="d-flex flex-column gap-3">
-				<div>
-					<div class="text-muted small">Akurasi Evaluasi</div>
-					<div class="h3 fw-bold mb-0">{{ $accuracyDisplay ?? '-' }}</div>
-				</div>
-				<div>
-					<div class="text-muted small">Output</div>
-					<div class="fw-bold">Risiko Rendah / Risiko Tinggi</div>
-				</div>
-				<div>
-					<div class="text-muted small">Penyimpanan</div>
-					<div class="fw-bold">Setiap prediksi valid masuk ke riwayat</div>
+				<div class="upload-footer d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
+					<p class="mb-0 text-muted">Baris valid akan diprediksi dan tersimpan ke riwayat akun.</p>
+					<div class="d-flex flex-wrap gap-2">
+						<button type="submit" class="btn btn-dark px-4">
+							<i class="fa-solid fa-wand-magic-sparkles me-2"></i>Proses Prediksi
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-
-	<div class="row g-4">
-		<div class="col-lg-7">
-			<div class="format-panel h-100">
-				<p class="eyebrow">Kolom Wajib</p>
-				<h2 class="h5 fw-bold mb-3">Header file yang diterima</h2>
-				<div class="column-grid">
-					@foreach($requiredColumns as $column)
-						<div class="column-chip">{{ $column }}</div>
-					@endforeach
-				</div>
-			</div>
-		</div>
-		<div class="col-lg-5">
-			<div class="format-panel h-100">
-				<p class="eyebrow">Contoh CSV</p>
-				<h2 class="h5 fw-bold mb-3">Satu baris contoh input</h2>
-				<pre class="example-box">gender,age,hypertension,heart_disease,ever_married,work_type,Residence_type,avg_glucose_level,bmi,smoking_status
-Female,25,0,0,No,Private,Urban,85,20.2,never smoked
-Male,80,1,1,Yes,Private,Urban,250,40,smokes</pre>
-			</div>
-		</div>
-	</div>
+	</form>
 
 	<script>
 		const dropzone = document.getElementById('dropzone');

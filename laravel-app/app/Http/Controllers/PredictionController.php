@@ -84,6 +84,7 @@ class PredictionController extends Controller
 	{
 		$validated = $request->validate([
 			'prediction_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+			'model' => 'nullable|in:decision_tree',
 		]);
 
 		try {
@@ -110,6 +111,8 @@ class PredictionController extends Controller
 		$validCount = 0;
 		$highCount = 0;
 		$lowCount = 0;
+		$modelMetrics = $this->modelMetrics();
+		$modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
 
 		foreach ($rows as $index => $row) {
 			$rowNumber = $index + 2;
@@ -121,6 +124,7 @@ class PredictionController extends Controller
 					'row' => $rowNumber,
 					'input' => $input,
 					'status' => 'error',
+					'modelName' => $modelName,
 					'message' => implode(' ', $validator->errors()->all()),
 				];
 				continue;
@@ -145,6 +149,7 @@ class PredictionController extends Controller
 					'row' => $rowNumber,
 					'input' => $validator->validated(),
 					'status' => 'success',
+					'modelName' => $modelName,
 					'prediction' => $prediction,
 					'riskLabel' => $risk['label'],
 					'riskTone' => $risk['tone'],
@@ -156,12 +161,11 @@ class PredictionController extends Controller
 					'row' => $rowNumber,
 					'input' => $validator->validated(),
 					'status' => 'error',
+					'modelName' => $modelName,
 					'message' => $exception->getMessage(),
 				];
 			}
 		}
-
-		$modelMetrics = $this->modelMetrics();
 
 		return view('upload-result', [
 			'fileName' => $validated['prediction_file']->getClientOriginalName(),
@@ -173,7 +177,7 @@ class PredictionController extends Controller
 				'high' => $highCount,
 				'low' => $lowCount,
 			],
-			'modelName' => $modelMetrics['model_name'] ?? 'Decision Tree',
+			'modelName' => $modelName,
 			'accuracyDisplay' => $modelMetrics['accuracy_display'] ?? null,
 		]);
 	}

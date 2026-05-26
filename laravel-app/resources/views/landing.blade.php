@@ -120,6 +120,26 @@
             padding: 1.5rem;
         }
 
+        .model-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border-radius: 999px;
+            padding: 0.45rem 0.7rem;
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+
+        .model-status.active {
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f5e57;
+        }
+
+        .model-status.pending {
+            background: rgba(245, 158, 11, 0.14);
+            color: #92400e;
+        }
+
         .stroke-visual {
             min-height: 340px;
             border-radius: 24px;
@@ -248,7 +268,8 @@
                         </h1>
                         <p class="lead text-white-50 mb-4">
                             Web ini membantu mengklasifikasikan potensi risiko stroke berdasarkan data kesehatan,
-                            gaya hidup, dan riwayat medis pengguna.
+                            gaya hidup, dan riwayat medis pengguna. Saat ini prediksi aktif memakai Decision Tree,
+                            dengan tampilan yang sudah disiapkan untuk KNN dan SVM.
                         </p>
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{{ route('form') }}" class="btn btn-light btn-lg fw-bold px-4">Mulai Prediksi</a>
@@ -265,8 +286,12 @@
                                 <span>Healthcare Stroke</span>
                             </div>
                             <div class="hero-list-item">
-                                <span>Model</span>
+                                <span>Model Aktif</span>
                                 <span>{{ $modelName }}</span>
+                            </div>
+                            <div class="hero-list-item">
+                                <span>Model UI</span>
+                                <span>DT, KNN, SVM</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Akurasi</span>
@@ -304,7 +329,7 @@
                 <div class="quick-stat">
                     <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
                     <h3 class="h6 fw-bold mb-2">Riwayat Terpantau</h3>
-                    <p class="soft-copy mb-0">Semua hasil tersimpan dan bisa dipantau di halaman history.</p>
+                    <p class="soft-copy mb-0">Hasil tersimpan dengan kolom model agar sumber prediksi lebih jelas.</p>
                 </div>
             </div>
         </section>
@@ -332,26 +357,29 @@
             </div>
         </section>
 
-    <section class="row g-4" id="dataset">
+    <section class="row g-4" id="models">
             <div class="col-md-4">
                 <div class="model-card">
-                    <p class="section-kicker">Model</p>
+                    <p class="section-kicker">Model Aktif</p>
                     <h3 class="h5 fw-bold mb-2">{{ $modelName }} Classifier</h3>
-                    <p class="soft-copy mb-0">Model machine learning yang digunakan untuk klasifikasi risiko stroke dari fitur input pasien.</p>
+                    <span class="model-status active mb-3"><i class="fa-solid fa-circle-check"></i>Siap Prediksi</span>
+                    <p class="soft-copy mb-0">Satu-satunya model yang saat ini sudah tersambung ke Flask ML API dan file <code>model.pkl</code>.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="model-card">
-                    <p class="section-kicker">Accuracy</p>
-                    <div class="metric-value mb-2">{{ $accuracyDisplay }}</div>
-                    <p class="soft-copy mb-0">Nilai akurasi model yang dikirim dari layanan Flask ML API saat prediksi dilakukan.</p>
+                    <p class="section-kicker">Model Tambahan</p>
+                    <h3 class="h5 fw-bold mb-2">KNN Classifier</h3>
+                    <span class="model-status pending mb-3"><i class="fa-solid fa-clock"></i>UI Ready</span>
+                    <p class="soft-copy mb-0">Sudah ditampilkan sebagai opsi, tetapi belum bisa dipakai sampai artefak model dan API-nya tersedia.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="model-card">
-                    <p class="section-kicker">Output</p>
-                    <h3 class="h5 fw-bold mb-2">Risiko Rendah / Tinggi</h3>
-                    <p class="soft-copy mb-0">Hasil prediksi ditampilkan sebagai label risiko dan tersimpan di halaman riwayat.</p>
+                    <p class="section-kicker">Model Tambahan</p>
+                    <h3 class="h5 fw-bold mb-2">SVM Classifier</h3>
+                    <span class="model-status pending mb-3"><i class="fa-solid fa-clock"></i>UI Ready</span>
+                    <p class="soft-copy mb-0">Sudah masuk ke tampilan multi-model, tetapi fungsi prediksinya masih menunggu integrasi backend.</p>
                 </div>
             </div>
         </section>
@@ -360,8 +388,8 @@
             <div class="row align-items-center g-3">
                 <div class="col-lg-8">
                     <p class="section-kicker">Siap Mulai</p>
-                    <h2 class="fw-bold mb-2">Mulai prediksi sekarang dan lihat hasilnya secara instan.</h2>
-                    <p class="soft-copy mb-0">Data Anda aman dan hanya digunakan untuk estimasi risiko.</p>
+                    <h2 class="fw-bold mb-2">Mulai prediksi sekarang dengan model Decision Tree aktif.</h2>
+                    <p class="soft-copy mb-0">Pilihan KNN dan SVM sudah terlihat di UI sebagai persiapan integrasi model berikutnya.</p>
                 </div>
                 <div class="col-lg-4 text-lg-end">
                     <a href="{{ route('form') }}" class="btn btn-dark btn-lg w-100">Mulai Prediksi</a>
@@ -391,7 +419,7 @@
                     <div class="step-card">
                         <span class="step-number mb-3">3</span>
                         <h3 class="h6 fw-bold">Prediksi ML API</h3>
-                        <p class="soft-copy mb-0">Laravel mengirim input ke Flask API, lalu model memberikan klasifikasi risiko.</p>
+                        <p class="soft-copy mb-0">Laravel mengirim input ke Flask API. Untuk sekarang, API masih memakai Decision Tree.</p>
                     </div>
                 </div>
                 <div class="col-md-3">

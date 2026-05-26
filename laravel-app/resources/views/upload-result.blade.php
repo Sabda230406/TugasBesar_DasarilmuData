@@ -12,7 +12,7 @@
 
 		.summary-grid {
 			display: grid;
-			grid-template-columns: repeat(4, minmax(0, 1fr));
+			grid-template-columns: repeat(5, minmax(0, 1fr));
 			gap: 1rem;
 			margin-bottom: 1.5rem;
 		}
@@ -39,6 +39,23 @@
 			font-weight: 800;
 			color: #0f172a;
 			margin-top: 0.35rem;
+		}
+
+		.summary-card.model-summary .value {
+			font-size: 1.25rem;
+		}
+
+		.model-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-size: 0.8rem;
+			font-weight: 800;
+			padding: 0.45rem 0.7rem;
+			white-space: nowrap;
 		}
 
 		.result-table-card {
@@ -146,6 +163,12 @@
 	</div>
 
 	<div class="summary-grid">
+		<div class="summary-card model-summary">
+			<div class="label">Model Dipakai</div>
+			<div class="value">
+				<span class="model-pill"><i class="fa-solid fa-tree"></i>{{ $modelName }}</span>
+			</div>
+		</div>
 		<div class="summary-card">
 			<div class="label">Total Baris</div>
 			<div class="value">{{ $summary['total'] }}</div>
@@ -170,6 +193,7 @@
 				<thead>
 					<tr>
 						<th>Baris</th>
+						<th>Model</th>
 						<th>Status</th>
 						<th>Prob. Risiko</th>
 						<th>Input</th>
@@ -180,6 +204,9 @@
 					@foreach($results as $item)
 						<tr>
 							<td class="fw-bold">#{{ $item['row'] }}</td>
+							<td>
+								<span class="model-pill"><i class="fa-solid fa-tree"></i>{{ $item['modelName'] ?? $modelName }}</span>
+							</td>
 							<td>
 								@if($item['status'] === 'success')
 									<span class="risk-pill {{ $item['riskTone'] }}">

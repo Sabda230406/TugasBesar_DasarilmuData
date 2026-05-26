@@ -51,6 +51,12 @@
 
 		.history-table th:nth-child(3),
 		.history-table td:nth-child(3) {
+			width: 150px;
+			text-align: center;
+		}
+
+		.history-table th:nth-child(4),
+		.history-table td:nth-child(4) {
 			width: 180px;
 			text-align: center;
 		}
@@ -131,6 +137,19 @@
 			font-size: 0.8rem;
 		}
 
+		.model-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+			padding: 0.4rem 0.7rem;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-weight: 800;
+			font-size: 0.8rem;
+			white-space: nowrap;
+		}
+
 		.filter-bar {
 			display: flex;
 			flex-wrap: wrap;
@@ -152,6 +171,38 @@
 			padding: 0.5rem 0.75rem;
 			font-size: 0.85rem;
 			min-width: 160px;
+		}
+
+		.filter-panel {
+			border-radius: 16px;
+			border: 1px solid rgba(148, 163, 184, 0.2);
+			background: #f8fafc;
+			padding: 1rem 1.25rem;
+		}
+
+		.filter-title {
+			font-size: 1rem;
+			font-weight: 800;
+			color: #0f172a;
+		}
+
+		.filter-help {
+			font-size: 0.88rem;
+			color: #64748b;
+			margin-bottom: 0;
+		}
+
+		.filter-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			padding: 0.35rem 0.75rem;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-size: 0.75rem;
+			font-weight: 700;
+			white-space: nowrap;
 		}
 
 		.filter-meta {
@@ -176,6 +227,73 @@
 			text-align: center;
 			padding: 2.5rem 1rem;
 			color: #94a3b8;
+		}
+
+		.history-pagination {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 1rem;
+			padding-top: 1rem;
+			border-top: 1px solid rgba(148, 163, 184, 0.16);
+		}
+
+		.pagination-summary {
+			color: #64748b;
+			font-size: 0.86rem;
+			font-weight: 700;
+		}
+
+		.history-pagination .pagination {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: flex-end;
+			gap: 0.45rem;
+			margin-bottom: 0;
+		}
+
+		.history-pagination .page-item .page-link {
+			min-width: 38px;
+			height: 38px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border: 1px solid rgba(148, 163, 184, 0.22);
+			border-radius: 12px;
+			background: #f8fafc;
+			color: #475569;
+			font-weight: 800;
+			box-shadow: none;
+			transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+		}
+
+		.history-pagination .page-item .page-link:hover {
+			border-color: rgba(15, 118, 110, 0.28);
+			background: rgba(15, 118, 110, 0.1);
+			color: #0f5e57;
+		}
+
+		.history-pagination .page-item.active .page-link {
+			border-color: #0f766e;
+			background: #0f766e;
+			color: #ffffff;
+		}
+
+		.history-pagination .page-item.disabled .page-link {
+			background: #eef2f7;
+			color: #94a3b8;
+			border-color: rgba(148, 163, 184, 0.16);
+		}
+
+		@media (max-width: 575.98px) {
+			.history-pagination {
+				align-items: stretch;
+			}
+
+			.history-pagination .pagination {
+				justify-content: flex-start;
+			}
 		}
 	</style>
 
@@ -221,6 +339,7 @@
 		<div class="card-body p-4">
 			@php
 				$filterKeys = [
+					'model' => 'Model',
 					'gender' => 'Gender',
 					'ever_married' => 'Married',
 					'work_type' => 'Work Type',
@@ -239,6 +358,10 @@
 						continue;
 					}
 					foreach ($filterKeys as $key => $label) {
+						if ($key === 'model') {
+							$filterOptions[$key][] = $row->model_name ?? 'Decision Tree';
+							continue;
+						}
 						if (isset($payload[$key]) && $payload[$key] !== '') {
 							$filterOptions[$key][] = $payload[$key];
 						}
@@ -249,6 +372,16 @@
 					sort($filterOptions[$key]);
 				}
 			@endphp
+			<div class="filter-panel mb-3">
+				<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+					<div>
+						<p class="eyebrow mb-1">Filter Riwayat</p>
+						<div class="filter-title">Saring data prediksi sesuai kebutuhan laporan</div>
+						<p class="filter-help">Gunakan filter untuk membatasi tampilan berdasarkan karakteristik pasien dan model yang dipakai. Data asli tidak berubah.</p>
+					</div>
+					<div class="filter-pill"><i class="fa-solid fa-filter"></i> Filter hanya untuk tampilan</div>
+				</div>
+			</div>
 			<div class="filter-bar">
 				@foreach($filterKeys as $key => $label)
 					<div>
@@ -271,6 +404,7 @@
 						<tr>
 							<th>No</th>
 							<th>Waktu</th>
+							<th>Model</th>
 							<th>Hasil Prediksi</th>
 							<th>Detail Input</th>
 						</tr>
@@ -286,10 +420,12 @@
 									? $item->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') 
 									: $item->created_at;
 								$rowPayload = json_decode($item->input_data, true);
+								$modelName = $item->model_name ?? 'Decision Tree';
 							@endphp
 							<tr class="history-row"
 								data-input="{{ strtolower($item->input_data) }}"
 								data-prediction="{{ strtolower($predictionLabel) }}"
+								data-model="{{ strtolower($modelName) }}"
 								data-time="{{ strtolower((string) $displayTime) }}"
 								data-gender="{{ strtolower((string) ($rowPayload['gender'] ?? '')) }}"
 								data-ever_married="{{ strtolower((string) ($rowPayload['ever_married'] ?? '')) }}"
@@ -301,6 +437,9 @@
 								<td class="fw-semibold text-muted">{{ ($data->firstItem() ?? 0) + $loop->index }}</td>
 								<td>
 									<span class="time-badge"><i class="fa-regular fa-clock"></i> {{ $displayTime }}</span>
+								</td>
+								<td>
+									<span class="model-badge"><i class="fa-solid fa-tree"></i> {{ $modelName }}</span>
 								</td>
 								<td>
 									<span class="prediction-badge {{ $predictionClass }}">
@@ -351,7 +490,7 @@
 							</div>
 						@empty
 							<tr>
-								<td colspan="3">
+								<td colspan="5">
 									<div class="empty-state">
 										<i class="fa-regular fa-clock fa-2x mb-2"></i>
 										<p class="mb-1 fw-semibold">Belum ada riwayat prediksi</p>
@@ -364,9 +503,75 @@
 				</table>
 			</div>
 			@if($data->hasPages())
-				<div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
-					<div class="text-muted small">Halaman {{ $data->currentPage() }} dari {{ $data->lastPage() }}</div>
-					{{ $data->links('pagination::bootstrap-5') }}
+				@php
+					$currentPage = $data->currentPage();
+					$lastPage = $data->lastPage();
+					$startPage = max(1, $currentPage - 1);
+					$endPage = min($lastPage, $currentPage + 1);
+
+					if ($currentPage === 1) {
+						$endPage = min($lastPage, 3);
+					}
+
+					if ($currentPage === $lastPage) {
+						$startPage = max(1, $lastPage - 2);
+					}
+				@endphp
+				<div class="history-pagination mt-4">
+					<div class="pagination-summary">
+						Menampilkan {{ $data->firstItem() ?? 0 }}-{{ $data->lastItem() ?? 0 }} dari {{ $data->total() }} data
+					</div>
+					<nav aria-label="Navigasi riwayat">
+						<ul class="pagination">
+							<li class="page-item {{ $data->onFirstPage() ? 'disabled' : '' }}">
+								@if($data->onFirstPage())
+									<span class="page-link" aria-hidden="true">&lsaquo;</span>
+								@else
+									<a class="page-link" href="{{ $data->previousPageUrl() }}" aria-label="Halaman sebelumnya">&lsaquo;</a>
+								@endif
+							</li>
+
+							@if($startPage > 1)
+								<li class="page-item">
+									<a class="page-link" href="{{ $data->url(1) }}">1</a>
+								</li>
+								@if($startPage > 2)
+									<li class="page-item disabled">
+										<span class="page-link">...</span>
+									</li>
+								@endif
+							@endif
+
+							@for($page = $startPage; $page <= $endPage; $page++)
+								<li class="page-item {{ $page === $currentPage ? 'active' : '' }}">
+									@if($page === $currentPage)
+										<span class="page-link">{{ $page }}</span>
+									@else
+										<a class="page-link" href="{{ $data->url($page) }}">{{ $page }}</a>
+									@endif
+								</li>
+							@endfor
+
+							@if($endPage < $lastPage)
+								@if($endPage < $lastPage - 1)
+									<li class="page-item disabled">
+										<span class="page-link">...</span>
+									</li>
+								@endif
+								<li class="page-item">
+									<a class="page-link" href="{{ $data->url($lastPage) }}">{{ $lastPage }}</a>
+								</li>
+							@endif
+
+							<li class="page-item {{ $data->hasMorePages() ? '' : 'disabled' }}">
+								@if($data->hasMorePages())
+									<a class="page-link" href="{{ $data->nextPageUrl() }}" aria-label="Halaman berikutnya">&rsaquo;</a>
+								@else
+									<span class="page-link" aria-hidden="true">&rsaquo;</span>
+								@endif
+							</li>
+						</ul>
+					</nav>
 				</div>
 			@endif
 		</div>

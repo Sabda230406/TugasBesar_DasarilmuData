@@ -28,6 +28,112 @@
 			font-size: 0.85rem;
 		}
 
+		.model-picker {
+			border: 1px solid rgba(15, 118, 110, 0.18);
+			border-radius: 16px;
+			background: #ffffff;
+			padding: 1rem;
+			box-shadow: 0 14px 28px rgba(15, 32, 50, 0.06);
+		}
+
+		.model-options {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.75rem;
+			margin-top: 0.85rem;
+		}
+
+		.model-option {
+			position: relative;
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr);
+			gap: 0.75rem;
+			align-items: center;
+			min-height: 92px;
+			border: 1px solid rgba(148, 163, 184, 0.32);
+			border-radius: 14px;
+			background: #f8fafc;
+			padding: 0.95rem;
+			transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+		}
+
+		.model-option input {
+			position: absolute;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.model-option.is-active {
+			border-color: rgba(15, 118, 110, 0.48);
+			background: linear-gradient(135deg, rgba(223, 247, 242, 0.9), #ffffff);
+			box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
+		}
+
+		.model-option.is-disabled {
+			cursor: not-allowed;
+			opacity: 0.74;
+		}
+
+		.model-option-icon {
+			width: 42px;
+			height: 42px;
+			border-radius: 12px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+		}
+
+		.model-option.is-disabled .model-option-icon {
+			background: rgba(148, 163, 184, 0.16);
+			color: #64748b;
+		}
+
+		.model-option-title,
+		.model-option-meta {
+			display: block;
+		}
+
+		.model-option-title {
+			font-weight: 800;
+			color: #0f172a;
+		}
+
+		.model-option-meta {
+			color: #64748b;
+			font-size: 0.78rem;
+			font-weight: 700;
+		}
+
+		.model-option-badge {
+			grid-column: 1 / -1;
+			width: fit-content;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-size: 0.72rem;
+			font-weight: 800;
+			padding: 0.3rem 0.55rem;
+		}
+
+		.model-option.is-disabled .model-option-badge {
+			background: rgba(245, 158, 11, 0.14);
+			color: #92400e;
+		}
+
+		.model-note {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+			border-radius: 999px;
+			background: rgba(245, 158, 11, 0.14);
+			color: #92400e;
+			font-size: 0.78rem;
+			font-weight: 800;
+			padding: 0.45rem 0.7rem;
+		}
+
 		.form-control,
 		.form-select {
 			border-radius: 12px;
@@ -45,6 +151,12 @@
 			border-top: 1px solid rgba(148, 163, 184, 0.2);
 			padding-top: 1.25rem;
 		}
+
+		@media (max-width: 767.98px) {
+			.model-options {
+				grid-template-columns: 1fr;
+			}
+		}
 	</style>
 
 	<div class="form-hero mb-4">
@@ -55,7 +167,7 @@
 				<p class="mb-0 text-muted">Lengkapi seluruh field agar hasil prediksi lebih akurat.</p>
 			</div>
 			<div class="text-end">
-				<span class="status-badge">Model Aktif</span>
+				<span class="status-badge"><i class="fa-solid fa-tree me-1"></i>Decision Tree Aktif</span>
 			</div>
 		</div>
 	</div>
@@ -72,6 +184,50 @@
 
 	<form action="/predict" method="POST" class="row g-4">
 		@csrf
+
+		<div class="col-12">
+			<div class="model-picker">
+				<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+					<div>
+						<div class="form-label fw-bold mb-1">Pilih Model Prediksi</div>
+						<div class="form-helper">Model tambahan sudah muncul di tampilan, tapi belum aktif untuk prediksi.</div>
+					</div>
+					<span class="model-note">
+						<i class="fa-solid fa-circle-info"></i>
+						Prediksi saat ini masih memakai Decision Tree.
+					</span>
+				</div>
+				<div class="model-options" role="radiogroup" aria-label="Pilih Model Prediksi">
+					<label class="model-option is-active" for="form_model_decision_tree">
+						<input id="form_model_decision_tree" type="radio" name="model" value="decision_tree" checked>
+						<span class="model-option-icon"><i class="fa-solid fa-tree"></i></span>
+						<span>
+							<span class="model-option-title">Decision Tree</span>
+							<span class="model-option-meta">Model aktif sekarang</span>
+						</span>
+						<span class="model-option-badge">Aktif</span>
+					</label>
+					<label class="model-option is-disabled" for="form_model_knn">
+						<input id="form_model_knn" type="radio" name="model" value="knn" disabled>
+						<span class="model-option-icon"><i class="fa-solid fa-diagram-project"></i></span>
+						<span>
+							<span class="model-option-title">KNN</span>
+							<span class="model-option-meta">Belum ada artefak model</span>
+						</span>
+						<span class="model-option-badge">Belum aktif</span>
+					</label>
+					<label class="model-option is-disabled" for="form_model_svm">
+						<input id="form_model_svm" type="radio" name="model" value="svm" disabled>
+						<span class="model-option-icon"><i class="fa-solid fa-vector-square"></i></span>
+						<span>
+							<span class="model-option-title">SVM</span>
+							<span class="model-option-meta">Belum ada artefak model</span>
+						</span>
+						<span class="model-option-badge">Belum aktif</span>
+					</label>
+				</div>
+			</div>
+		</div>
 
 		<div class="col-lg-6">
 			<div class="form-card h-100">
