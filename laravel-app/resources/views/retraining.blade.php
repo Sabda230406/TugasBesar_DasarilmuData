@@ -651,7 +651,7 @@
 				</div>
 				<div class="modal-footer p-4 pt-0 border-0">
 					<button type="button" class="btn btn-dark btn-lg w-100" id="confirmRetrainingGate">
-						Saya paham, buka form upload
+						Saya paham, lanjut ke form retraining
 					</button>
 				</div>
 			</div>
