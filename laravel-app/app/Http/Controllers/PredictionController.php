@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\History;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Throwable;
@@ -13,27 +14,47 @@ class PredictionController extends Controller
 {
 	public function landing()
 	{
+		$selectedModelKey = $this->defaultModelKey();
+
 		return view('landing', [
-			'modelMetrics' => $this->modelMetrics(),
+			'modelMetrics' => $this->modelMetrics($selectedModelKey),
+			'models' => $this->availableModels(),
+			'selectedModelKey' => $selectedModelKey,
 		]);
 	}
 
 	public function index()
 	{
-		return view('form');
+		return view('form', [
+			'modelMetrics' => $this->modelMetrics(),
+			'models' => $this->availableModels(),
+			'selectedModelKey' => $this->defaultModelKey(),
+		]);
 	}
 
 	public function upload()
 	{
+		$selectedModelKey = $this->defaultModelKey();
+
 		return view('upload', [
-			'modelMetrics' => $this->modelMetrics(),
-			'requiredColumns' => $this->featureColumns(),
+			'modelMetrics' => $this->modelMetrics($selectedModelKey),
+			'models' => $this->availableModels(),
+			'selectedModelKey' => $selectedModelKey,
+			'requiredColumns' => $this->featureColumns($selectedModelKey),
 		]);
 	}
 
 	public function predict(Request $request)
 	{
 		$validated = $request->validate($this->predictionRules());
+
+		try {
+			$modelKey = $this->resolveRequestedModelKey($request->input('model'));
+		} catch (Throwable $exception) {
+			return back()
+				->withErrors(['model' => $exception->getMessage()])
+				->withInput();
+		}
 
 		$input = [
 			'gender' => $validated['gender'],
@@ -49,24 +70,21 @@ class PredictionController extends Controller
 		];
 
 		try {
-			$result = $this->predictInput($input);
+			$result = $this->predictInput($input, $modelKey);
 		} catch (Throwable $exception) {
 			return back()
 				->withErrors(['api' => $exception->getMessage()])
 				->withInput();
 		}
 
-		History::create([
-			'user_id' => $request->user()->id,
-			'input_data' => json_encode($input),
-			'prediction' => $result['prediction'],
-		]);
-
 		$risk = $this->riskDetails((int) $result['prediction']);
 
-		$modelMetrics = $this->modelMetrics();
+		$modelMetrics = $this->modelMetrics($modelKey);
 		$accuracy = $modelMetrics['accuracy'] ?? $result['accuracy'] ?? null;
-		$modelName = $modelMetrics['model_name'] ?? $result['model_name'] ?? 'Decision Tree';
+		$modelName = $result['model_name'] ?? $modelMetrics['model_name'] ?? $this->modelDisplayName($modelKey);
+		$probability = $result['high_risk_probability'] ?? null;
+
+		$this->storeHistory($request, $input, (int) $result['prediction'], $modelName);
 
 		return view('result', [
 			'prediction' => $result['prediction'],
@@ -76,6 +94,7 @@ class PredictionController extends Controller
 			'riskTips' => $risk['tips'],
 			'accuracy' => $accuracy,
 			'accuracyDisplay' => $this->formatAccuracy($accuracy),
+			'probabilityDisplay' => $this->formatAccuracy($probability),
 			'modelName' => $modelName,
 		]);
 	}
@@ -84,8 +103,16 @@ class PredictionController extends Controller
 	{
 		$validated = $request->validate([
 			'prediction_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
-			'model' => 'nullable|in:decision_tree',
+			'model' => 'nullable|string',
 		]);
+
+		try {
+			$modelKey = $this->resolveRequestedModelKey($validated['model'] ?? null);
+		} catch (Throwable $exception) {
+			return back()
+				->withErrors(['model' => $exception->getMessage()])
+				->withInput();
+		}
 
 		try {
 			$rows = $this->rowsFromSpreadsheet($validated['prediction_file']);
@@ -111,8 +138,8 @@ class PredictionController extends Controller
 		$validCount = 0;
 		$highCount = 0;
 		$lowCount = 0;
-		$modelMetrics = $this->modelMetrics();
-		$modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
+		$modelMetrics = $this->modelMetrics($modelKey);
+		$modelName = $modelMetrics['model_name'] ?? $this->modelDisplayName($modelKey);
 
 		foreach ($rows as $index => $row) {
 			$rowNumber = $index + 2;
@@ -131,16 +158,13 @@ class PredictionController extends Controller
 			}
 
 			try {
-				$predictionResult = $this->predictInput($validator->validated());
+				$predictionResult = $this->predictInput($validator->validated(), $modelKey);
 				$prediction = (int) $predictionResult['prediction'];
 				$risk = $this->riskDetails($prediction);
 				$probability = $predictionResult['high_risk_probability'] ?? null;
+				$rowModelName = $predictionResult['model_name'] ?? $modelName;
 
-				History::create([
-					'user_id' => $request->user()->id,
-					'input_data' => json_encode($validator->validated()),
-					'prediction' => $prediction,
-				]);
+				$this->storeHistory($request, $validator->validated(), $prediction, $rowModelName);
 
 				$validCount++;
 				$prediction === 1 ? $highCount++ : $lowCount++;
@@ -149,7 +173,7 @@ class PredictionController extends Controller
 					'row' => $rowNumber,
 					'input' => $validator->validated(),
 					'status' => 'success',
-					'modelName' => $modelName,
+					'modelName' => $rowModelName,
 					'prediction' => $prediction,
 					'riskLabel' => $risk['label'],
 					'riskTone' => $risk['tone'],
@@ -205,8 +229,23 @@ class PredictionController extends Controller
 		];
 	}
 
-	private function featureColumns(): array
+	private function featureColumns(?string $modelKey = null): array
 	{
+		$modelKey = $modelKey ? $this->normalizeModelKey($modelKey) : $this->defaultModelKey();
+		$artifacts = $this->resolveModelArtifacts($modelKey);
+		$path = $artifacts['feature_path'] ?? null;
+
+		if ($path && is_file($path)) {
+			$payload = json_decode((string) file_get_contents($path), true);
+			$columns = is_array($payload) && array_key_exists('feature_columns', $payload)
+				? $payload['feature_columns']
+				: $payload;
+
+			if (is_array($columns)) {
+				return $columns;
+			}
+		}
+
 		return [
 			'gender',
 			'age',
@@ -221,10 +260,11 @@ class PredictionController extends Controller
 		];
 	}
 
-	private function predictInput(array $input): array
+	private function predictInput(array $input, ?string $modelKey = null): array
 	{
 		$response = Http::timeout(20)->post('http://127.0.0.1:5001/predict', [
 			'input' => $input,
+			'model' => $modelKey ?? $this->defaultModelKey(),
 		]);
 
 		if (! $response->ok()) {
@@ -449,16 +489,192 @@ class PredictionController extends Controller
 		return is_numeric($normalized) ? (float) $normalized : null;
 	}
 
-	private function modelMetrics(): array
+	private function mlApiDirectory(): string
 	{
-		$defaults = [
-			'model_name' => 'Decision Tree',
-			'accuracy' => null,
-			'accuracy_display' => null,
-		];
-		$path = dirname(base_path()) . DIRECTORY_SEPARATOR . 'ml-api' . DIRECTORY_SEPARATOR . 'model_metrics.json';
+		return dirname(base_path()) . DIRECTORY_SEPARATOR . 'ml-api' . DIRECTORY_SEPARATOR;
+	}
 
-		if (! is_file($path)) {
+	private function modelDefinitions(): array
+	{
+		return [
+			'decision_tree' => [
+				'label' => 'Decision Tree',
+				'icon' => 'fa-tree',
+				'aliases' => ['decision_tree', 'decision-tree', 'dt', 'tree', 'Decision Tree'],
+				'artifacts' => [
+					['model' => 'DT_model.pkl', 'features' => 'DT_feature_columns.json', 'metrics' => 'DT_model_metrics.json'],
+					['model' => 'dt_model.pkl', 'features' => 'dt_feature_columns.json', 'metrics' => 'dt_model_metrics.json'],
+					['model' => 'model.pkl', 'features' => 'feature_columns.json', 'metrics' => 'model_metrics.json'],
+				],
+			],
+			'knn' => [
+				'label' => 'KNN',
+				'icon' => 'fa-diagram-project',
+				'aliases' => ['knn', 'KNN'],
+				'artifacts' => [
+					['model' => 'knn_model.pkl', 'features' => 'knn_feature_columns.json', 'metrics' => 'knn_model_metrics.json'],
+					['model' => 'KNN_model.pkl', 'features' => 'KNN_feature_columns.json', 'metrics' => 'KNN_model_metrics.json'],
+				],
+			],
+			'svm' => [
+				'label' => 'SVM',
+				'icon' => 'fa-vector-square',
+				'aliases' => ['svm', 'SVM'],
+				'artifacts' => [
+					['model' => 'svm_model.pkl', 'features' => 'svm_feature_columns.json', 'metrics' => 'svm_model_metrics.json'],
+					['model' => 'SVM_model.pkl', 'features' => 'SVM_feature_columns.json', 'metrics' => 'SVM_model_metrics.json'],
+				],
+			],
+		];
+	}
+
+	private function canonicalModelKey(?string $modelKey): ?string
+	{
+		if ($modelKey === null || trim($modelKey) === '') {
+			return null;
+		}
+
+		$needle = strtolower(str_replace([' ', '-'], '_', trim($modelKey)));
+		foreach ($this->modelDefinitions() as $key => $definition) {
+			$aliases = array_map(
+				fn ($alias) => strtolower(str_replace([' ', '-'], '_', $alias)),
+				$definition['aliases']
+			);
+
+			if ($needle === $key || in_array($needle, $aliases, true)) {
+				return $key;
+			}
+		}
+
+		throw new \RuntimeException('Model yang dipilih tidak dikenal.');
+	}
+
+	private function normalizeModelKey(?string $modelKey): string
+	{
+		return $this->canonicalModelKey($modelKey) ?? $this->defaultModelKey();
+	}
+
+	private function defaultModelKey(): string
+	{
+		try {
+			$preferred = $this->canonicalModelKey(env('ML_ACTIVE_MODEL', 'decision_tree')) ?? 'decision_tree';
+		} catch (Throwable) {
+			$preferred = 'decision_tree';
+		}
+
+		if ($this->modelIsAvailable($preferred)) {
+			return $preferred;
+		}
+
+		foreach (array_keys($this->modelDefinitions()) as $key) {
+			if ($this->modelIsAvailable($key)) {
+				return $key;
+			}
+		}
+
+		return 'decision_tree';
+	}
+
+	private function resolveModelArtifacts(string $modelKey): array
+	{
+		$modelKey = $this->canonicalModelKey($modelKey) ?? 'decision_tree';
+		$definition = $this->modelDefinitions()[$modelKey];
+		$basePath = $this->mlApiDirectory();
+
+		foreach ($definition['artifacts'] as $artifact) {
+			$modelPath = $basePath . $artifact['model'];
+			$featurePath = $basePath . $artifact['features'];
+			$metricsPath = $basePath . $artifact['metrics'];
+
+			if (is_file($modelPath) && is_file($featurePath)) {
+				return [
+					'available' => true,
+					'model_path' => $modelPath,
+					'feature_path' => $featurePath,
+					'metrics_path' => is_file($metricsPath) ? $metricsPath : null,
+				];
+			}
+		}
+
+		return [
+			'available' => false,
+			'model_path' => null,
+			'feature_path' => null,
+			'metrics_path' => null,
+		];
+	}
+
+	private function modelIsAvailable(string $modelKey): bool
+	{
+		return $this->resolveModelArtifacts($modelKey)['available'];
+	}
+
+	private function resolveRequestedModelKey(?string $modelKey): string
+	{
+		$modelKey = $this->normalizeModelKey($modelKey);
+
+		if (! $this->modelIsAvailable($modelKey)) {
+			throw new \RuntimeException($this->modelDisplayName($modelKey) . ' belum tersedia untuk prediksi.');
+		}
+
+		return $modelKey;
+	}
+
+	private function availableModels(): array
+	{
+		$models = [];
+
+		foreach ($this->modelDefinitions() as $key => $definition) {
+			$artifacts = $this->resolveModelArtifacts($key);
+			$metrics = $this->readModelMetrics($key, $artifacts);
+			$accuracyDisplay = $this->formatAccuracy($metrics['accuracy'] ?? null);
+			$strokeMetrics = $metrics['classification_report']['1'] ?? [];
+
+			$models[$key] = [
+				'key' => $key,
+				'name' => $metrics['model_name'] ?? $definition['label'],
+				'label' => $definition['label'],
+				'icon' => $definition['icon'],
+				'available' => $artifacts['available'],
+				'accuracy_display' => $accuracyDisplay,
+				'recall_display' => $this->formatAccuracy($strokeMetrics['recall'] ?? null),
+				'f1_display' => $this->formatAccuracy($strokeMetrics['f1-score'] ?? null),
+				'status_label' => $artifacts['available'] ? 'Siap Prediksi' : 'Belum Aktif',
+				'meta' => $artifacts['available']
+					? 'Siap digunakan untuk prediksi'
+					: 'Artefak model belum tersedia',
+				'metrics' => array_merge($metrics, [
+					'accuracy_display' => $accuracyDisplay,
+					'model_key' => $key,
+				]),
+			];
+		}
+
+		return $models;
+	}
+
+	private function modelDisplayName(string $modelKey): string
+	{
+		$modelKey = $this->canonicalModelKey($modelKey) ?? 'decision_tree';
+		$definition = $this->modelDefinitions()[$modelKey];
+		$metrics = $this->readModelMetrics($modelKey);
+
+		return $metrics['model_name'] ?? $definition['label'];
+	}
+
+	private function readModelMetrics(string $modelKey, ?array $artifacts = null): array
+	{
+		$modelKey = $this->canonicalModelKey($modelKey) ?? 'decision_tree';
+		$definition = $this->modelDefinitions()[$modelKey];
+		$artifacts ??= $this->resolveModelArtifacts($modelKey);
+
+		$defaults = [
+			'model_name' => $definition['label'],
+			'accuracy' => null,
+		];
+
+		$path = $artifacts['metrics_path'] ?? null;
+		if (! $path || ! is_file($path)) {
 			return $defaults;
 		}
 
@@ -467,11 +683,45 @@ class PredictionController extends Controller
 			return $defaults;
 		}
 
-		$accuracy = $metrics['accuracy'] ?? null;
 		$metrics['model_name'] = $metrics['model_name'] ?? $defaults['model_name'];
-		$metrics['accuracy_display'] = $this->formatAccuracy($accuracy);
 
 		return array_merge($defaults, $metrics);
+	}
+
+	private function modelMetrics(?string $modelKey = null): array
+	{
+		$modelKey = $modelKey ? $this->normalizeModelKey($modelKey) : $this->defaultModelKey();
+		$metrics = $this->readModelMetrics($modelKey);
+		$metrics['model_key'] = $modelKey;
+		$metrics['accuracy_display'] = $this->formatAccuracy($metrics['accuracy'] ?? null);
+
+		return $metrics;
+	}
+
+	private function storeHistory(Request $request, array $input, int $prediction, string $modelName): void
+	{
+		$payload = [
+			'user_id' => $request->user()->id,
+			'input_data' => json_encode($input),
+			'prediction' => $prediction,
+		];
+
+		if ($this->historiesHaveModelNameColumn()) {
+			$payload['model_name'] = $modelName;
+		}
+
+		History::create($payload);
+	}
+
+	private function historiesHaveModelNameColumn(): bool
+	{
+		static $hasColumn = null;
+
+		if ($hasColumn === null) {
+			$hasColumn = Schema::hasColumn('histories', 'model_name');
+		}
+
+		return $hasColumn;
 	}
 
 	private function formatAccuracy($accuracy): ?string

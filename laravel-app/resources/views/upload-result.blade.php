@@ -1,6 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
+	@php
+		$modelIconFor = function ($name) {
+			$name = strtolower((string) $name);
+			return str_contains($name, 'knn') ? 'fa-diagram-project' : (str_contains($name, 'svm') ? 'fa-vector-square' : 'fa-tree');
+		};
+	@endphp
+
 	<style>
 		.result-header {
 			display: flex;
@@ -166,7 +173,7 @@
 		<div class="summary-card model-summary">
 			<div class="label">Model Dipakai</div>
 			<div class="value">
-				<span class="model-pill"><i class="fa-solid fa-tree"></i>{{ $modelName }}</span>
+				<span class="model-pill"><i class="fa-solid {{ $modelIconFor($modelName) }}"></i>{{ $modelName }}</span>
 			</div>
 		</div>
 		<div class="summary-card">
@@ -205,7 +212,7 @@
 						<tr>
 							<td class="fw-bold">#{{ $item['row'] }}</td>
 							<td>
-								<span class="model-pill"><i class="fa-solid fa-tree"></i>{{ $item['modelName'] ?? $modelName }}</span>
+								<span class="model-pill"><i class="fa-solid {{ $modelIconFor($item['modelName'] ?? $modelName) }}"></i>{{ $item['modelName'] ?? $modelName }}</span>
 							</td>
 							<td>
 								@if($item['status'] === 'success')

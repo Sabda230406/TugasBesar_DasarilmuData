@@ -206,6 +206,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('retraining') || request()->routeIs('retraining.*') ? 'active' : '' }}" href="{{ route('retraining') }}">
+                            <i class="fa-solid fa-rotate me-1"></i> Retraining
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('history') ? 'active' : '' }}" href="{{ route('history') }}">
                             <i class="fa-solid fa-clock-rotate-left me-1"></i> Riwayat
                         </a>

@@ -1,6 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
+	@php
+		$modelIconFor = function ($name) {
+			$name = strtolower((string) $name);
+			return str_contains($name, 'knn') ? 'fa-diagram-project' : (str_contains($name, 'svm') ? 'fa-vector-square' : 'fa-tree');
+		};
+	@endphp
+
 	<style>
 		.history-hero {
 			background: linear-gradient(135deg, rgba(15, 118, 110, 0.14) 0%, rgba(15, 118, 110, 0.02) 100%);
@@ -439,7 +446,7 @@
 									<span class="time-badge"><i class="fa-regular fa-clock"></i> {{ $displayTime }}</span>
 								</td>
 								<td>
-									<span class="model-badge"><i class="fa-solid fa-tree"></i> {{ $modelName }}</span>
+									<span class="model-badge"><i class="fa-solid {{ $modelIconFor($modelName) }}"></i> {{ $modelName }}</span>
 								</td>
 								<td>
 									<span class="prediction-badge {{ $predictionClass }}">

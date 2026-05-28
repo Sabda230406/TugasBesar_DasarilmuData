@@ -57,6 +57,29 @@
 			padding-left: 1.1rem;
 			color: #607086;
 		}
+
+		.result-meta {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			border-radius: 999px;
+			background: #f8fafc;
+			border: 1px solid rgba(148, 163, 184, 0.22);
+			color: #475569;
+			font-size: 0.86rem;
+			font-weight: 700;
+			padding: 0.5rem 0.75rem;
+		}
+
+		.medical-note {
+			border-radius: 14px;
+			background: rgba(245, 158, 11, 0.12);
+			border: 1px solid rgba(245, 158, 11, 0.2);
+			color: #7c2d12;
+			padding: 0.85rem 1rem;
+			font-size: 0.92rem;
+			line-height: 1.6;
+		}
 	</style>
 
 	<div class="result-shell">
@@ -68,11 +91,25 @@
 					<i class="fa-solid {{ $riskTone === 'high' ? 'fa-triangle-exclamation' : 'fa-circle-check' }}"></i>
 					{{ $riskLabel }}
 				</span>
+				@if($probabilityDisplay)
+					<span class="result-meta">
+						<i class="fa-solid fa-chart-simple"></i>
+						Probabilitas risiko tinggi: {{ $probabilityDisplay }}
+					</span>
+				@endif
 				@if($accuracyDisplay)
-					<span class="text-muted">Akurasi {{ $modelName ?? 'Decision Tree' }}: {{ $accuracyDisplay }}</span>
+					<span class="result-meta">
+						<i class="fa-solid fa-brain"></i>
+						Evaluasi {{ $modelName ?? 'model' }}: accuracy {{ $accuracyDisplay }}
+					</span>
 				@endif
 			</div>
 			<p class="text-muted mb-4">{{ $riskMessage }}</p>
+
+			<div class="medical-note mb-4">
+				<i class="fa-solid fa-circle-info me-1"></i>
+				Hasil ini adalah screening awal berbasis data input, bukan diagnosis medis. Jika ada gejala atau hasil risiko tinggi, tetap konsultasikan ke dokter/tenaga medis.
+			</div>
 
 			<div class="tips-card">
 				<h6><i class="fa-solid fa-notes-medical me-2"></i>Tips Kesehatan</h6>

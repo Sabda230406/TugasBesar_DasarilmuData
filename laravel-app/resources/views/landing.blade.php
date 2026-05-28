@@ -2,7 +2,14 @@
 
 @section('content')
     @php
-        $modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
+        $modelOptions = $models ?? [];
+        $selectedModelKey = $selectedModelKey ?? array_key_first($modelOptions) ?? 'decision_tree';
+        $selectedModel = $modelOptions[$selectedModelKey] ?? ($modelOptions ? reset($modelOptions) : null);
+        $modelMetrics = $selectedModel['metrics'] ?? $modelMetrics;
+        $modelName = $selectedModel['name'] ?? $modelMetrics['model_name'] ?? 'Decision Tree';
+        $readyModels = array_filter($modelOptions, fn ($model) => $model['available'] ?? false);
+        $readyCount = count($readyModels);
+        $readyModelNames = $readyModels ? implode(', ', array_map(fn ($model) => $model['name'] ?? $model['label'], $readyModels)) : 'Belum tersedia';
         $formatPercent = function ($value) {
             if (! is_numeric($value)) {
                 return null;
@@ -15,13 +22,6 @@
 
             return number_format($value, 2) . '%';
         };
-        $strokeMetrics = $modelMetrics['classification_report']['1'] ?? [];
-        $confusionMatrix = $modelMetrics['confusion_matrix'] ?? [];
-        $accuracyDisplay = $modelMetrics['accuracy_display'] ?? 'Belum tersedia';
-        $recallDisplay = $formatPercent($strokeMetrics['recall'] ?? null) ?? 'Belum tersedia';
-        $f1Display = $formatPercent($strokeMetrics['f1-score'] ?? null) ?? 'Belum tersedia';
-        $falseNegative = $confusionMatrix[1][0] ?? null;
-        $truePositive = $confusionMatrix[1][1] ?? null;
     @endphp
 
     <style>
@@ -450,8 +450,12 @@
                                 <span>Healthcare Stroke</span>
                             </div>
                             <div class="hero-list-item">
-                                <span>Model Aktif</span>
+                                <span>Model Utama</span>
                                 <span>{{ $modelName }}</span>
+                            </div>
+                            <div class="hero-list-item">
+                                <span>Model Tersedia</span>
+                                <span>{{ $readyModelNames }}</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Mode Prediksi</span>
@@ -459,7 +463,7 @@
                             </div>
                             <div class="hero-list-item">
                                 <span>Status</span>
-                                <span>ML API Terhubung</span>
+                                <span>{{ $readyCount }} Model Siap</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Output</span>
@@ -485,15 +489,15 @@
             <div class="col-md-4">
                 <div class="quick-stat">
                     <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
-                    <h3 class="h6 fw-bold mb-2">Siap Multi-Model</h3>
-                    <p class="soft-copy mb-0">Tampilan disiapkan agar model lain seperti KNN dan SVM bisa diintegrasikan berikutnya.</p>
+                    <h3 class="h6 fw-bold mb-2">Model yang Dipakai</h3>
+                    <p class="soft-copy mb-0">Saat ini {{ $readyModelNames }} aktif. Model lain akan muncul otomatis saat siap.</p>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="quick-stat">
                     <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
-                    <h3 class="h6 fw-bold mb-2">Evaluasi Transparan</h3>
-                    <p class="soft-copy mb-0">Setiap model perlu dibaca dengan metrik yang sesuai, bukan hanya accuracy.</p>
+                    <h3 class="h6 fw-bold mb-2">Hasil Transparan</h3>
+                    <p class="soft-copy mb-0">Metrik evaluasi ditampilkan agar pengguna tahu seberapa akurat model bekerja.</p>
                 </div>
             </div>
         </section>
@@ -510,102 +514,108 @@
                 <p class="section-kicker">Informasi Umum</p>
                 <h2 class="fw-bold mb-3">Stroke terjadi saat aliran darah ke otak terganggu.</h2>
                 <p class="soft-copy mb-3">
-                    Stroke dapat disebabkan oleh penyumbatan pembuluh darah atau pecahnya pembuluh darah di otak.
-                    Risiko stroke bisa dipengaruhi oleh usia, hipertensi, penyakit jantung, kadar glukosa,
-                    BMI, kebiasaan merokok, dan beberapa faktor gaya hidup lain.
+                    Stroke dapat disebabkan oleh penyumbatan atau pecahnya pembuluh darah di otak. Risiko bisa dipengaruhi
+                    oleh usia, hipertensi, penyakit jantung, kadar glukosa, BMI, kebiasaan merokok, dan faktor gaya hidup lainnya.
                 </p>
                 <p class="soft-copy mb-0">
-                    Sistem ini bukan pengganti diagnosis dokter, tetapi bisa menjadi alat bantu edukasi
-                    dan screening awal berbasis data.
+                    Hasil prediksi bersifat edukasi dan bukan pengganti diagnosis dokter.
                 </p>
             </div>
         </section>
 
     <section class="row g-4" id="models">
-            <div class="col-md-4">
-                <div class="model-card">
-                    <p class="section-kicker">Model Aktif</p>
-                    <h3 class="h5 fw-bold mb-2">{{ $modelName }} Classifier</h3>
-                    <span class="model-status active mb-3"><i class="fa-solid fa-circle-check"></i>Siap Prediksi</span>
-                    <p class="soft-copy mb-3">Model ini tersambung ke Flask ML API dan file <code>model.pkl</code>.</p>
-                    <button class="btn btn-outline-dark model-detail-toggle w-100" type="button" data-bs-toggle="modal" data-bs-target="#modelDetailModal">
-                        <i class="fa-solid fa-circle-info me-1"></i>
-                        Cara membaca hasil model
-                    </button>
-                    <div class="modal fade model-detail-modal" id="modelDetailModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-lg modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title"><i class="fa-solid fa-circle-info me-2"></i>Cara membaca hasil model</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="dt-detail-panel">
-                                        <p class="fw-bold mb-2">Hasil ini adalah screening awal.</p>
-                                        <p class="soft-copy small mb-3">
-                                            Prediksi membantu memberi gambaran risiko dari data yang diinput. Hasil risiko tinggi
-                                            bukan berarti pasti stroke, dan hasil risiko rendah bukan berarti bebas risiko selamanya.
-                                        </p>
-
-                                        <div class="dt-simple-note small mb-3">
-                                            Model dibuat lebih berhati-hati terhadap kemungkinan risiko tinggi. Jadi, sebagian hasil
-                                            bisa muncul sebagai peringatan agar pengguna mempertimbangkan pemeriksaan lanjutan.
+            @foreach($modelOptions as $key => $model)
+                @php
+                    $isAvailable = $model['available'] ?? false;
+                    $isSelected = $selectedModelKey === $key && $isAvailable;
+                    $modelLabel = $model['name'] ?? $model['label'];
+                    $modelCardMetrics = $model['metrics'] ?? [];
+                    $modelStrokeMetrics = $modelCardMetrics['classification_report']['1'] ?? [];
+                    $modelConfusionMatrix = $modelCardMetrics['confusion_matrix'] ?? [];
+                    $modelAccuracyDisplay = $modelCardMetrics['accuracy_display'] ?? ($formatPercent($modelCardMetrics['accuracy'] ?? null) ?? 'Belum tersedia');
+                    $modelRecallDisplay = $formatPercent($modelStrokeMetrics['recall'] ?? null) ?? 'Belum tersedia';
+                    $modelF1Display = $formatPercent($modelStrokeMetrics['f1-score'] ?? null) ?? 'Belum tersedia';
+                    $modelFalseNegative = $modelConfusionMatrix[1][0] ?? null;
+                    $modelTruePositive = $modelConfusionMatrix[1][1] ?? null;
+                    $modalId = 'modelDetailModal' . str_replace('_', '', $key);
+                @endphp
+                <div class="col-md-4">
+                    <div class="model-card">
+                        <p class="section-kicker">{{ $isSelected ? 'Model Utama' : ($isAvailable ? 'Model Siap' : 'Model Tambahan') }}</p>
+                        <h3 class="h5 fw-bold mb-2">{{ $modelLabel }} Classifier</h3>
+                        <span class="model-status {{ $isAvailable ? 'active' : 'pending' }} mb-3">
+                            <i class="fa-solid {{ $isAvailable ? 'fa-circle-check' : 'fa-clock' }}"></i>{{ $model['status_label'] ?? '-' }}
+                        </span>
+                        @if($isAvailable)
+                            <p class="soft-copy mb-3">
+                                {{ $isSelected ? 'Model utama' : 'Model ini' }} tersambung ke Flask ML API dan bisa dipakai untuk prediksi satu pasien maupun banyak data sekaligus.
+                            </p>
+                            <button class="btn btn-outline-dark model-detail-toggle w-100" type="button" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
+                                <i class="fa-solid fa-circle-info me-1"></i>
+                                Cara membaca hasil model
+                            </button>
+                            <div class="modal fade model-detail-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-lg modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title"><i class="fa-solid fa-circle-info me-2"></i>Cara membaca hasil {{ $modelLabel }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
+                                        <div class="modal-body">
+                                            <div class="dt-detail-panel">
+                                                <p class="fw-bold mb-2">Hasil ini adalah screening awal.</p>
+                                                <p class="soft-copy small mb-3">
+                                                    Prediksi membantu memberi gambaran risiko dari data yang diinput. Hasil risiko tinggi
+                                                    bukan berarti pasti stroke, dan hasil risiko rendah bukan berarti bebas risiko selamanya.
+                                                </p>
 
-                                        <p class="fw-bold small mb-2">Detail evaluasi model aktif</p>
-                                        <div class="dt-metric-grid mb-3">
-                                            <div class="dt-metric-box">
-                                                <p class="dt-metric-label">Deteksi Risiko Tinggi</p>
-                                                <div class="dt-metric-value primary">{{ $recallDisplay }}</div>
-                                            </div>
-                                            <div class="dt-metric-box">
-                                                <p class="dt-metric-label">Keseimbangan Model</p>
-                                                <div class="dt-metric-value">{{ $f1Display }}</div>
-                                            </div>
-                                            <div class="dt-metric-box">
-                                                <p class="dt-metric-label">Accuracy Evaluasi</p>
-                                                <div class="dt-metric-value">{{ $accuracyDisplay }}</div>
+                                                <div class="dt-simple-note small mb-3">
+                                                    Model dibuat lebih berhati-hati terhadap kemungkinan risiko tinggi. Jadi, sebagian hasil
+                                                    bisa muncul sebagai peringatan agar pengguna mempertimbangkan pemeriksaan lanjutan.
+                                                </div>
+
+                                                <p class="fw-bold small mb-2">Detail evaluasi {{ $modelLabel }}</p>
+                                                <div class="dt-metric-grid mb-3">
+                                                    <div class="dt-metric-box">
+                                                        <p class="dt-metric-label">Deteksi Risiko Tinggi</p>
+                                                        <div class="dt-metric-value primary">{{ $modelRecallDisplay }}</div>
+                                                    </div>
+                                                    <div class="dt-metric-box">
+                                                        <p class="dt-metric-label">Keseimbangan Model</p>
+                                                        <div class="dt-metric-value">{{ $modelF1Display }}</div>
+                                                    </div>
+                                                    <div class="dt-metric-box">
+                                                        <p class="dt-metric-label">Accuracy Evaluasi</p>
+                                                        <div class="dt-metric-value">{{ $modelAccuracyDisplay }}</div>
+                                                    </div>
+                                                </div>
+
+                                                <ul class="explain-list small">
+                                                    <li>
+                                                        <i class="fa-solid fa-shield-heart"></i>
+                                                        <span>Jika hasilnya risiko tinggi, sebaiknya lakukan pengecekan lanjutan atau konsultasi tenaga medis.</span>
+                                                    </li>
+                                                    @if(is_numeric($modelFalseNegative) && is_numeric($modelTruePositive))
+                                                        <li>
+                                                            <i class="fa-solid fa-chart-simple"></i>
+                                                            <span>Pada data uji, {{ $modelLabel }} mendeteksi {{ $modelTruePositive }} data risiko tinggi dan melewatkan {{ $modelFalseNegative }} data risiko tinggi.</span>
+                                                        </li>
+                                                    @endif
+                                                </ul>
                                             </div>
                                         </div>
-
-                                        <ul class="explain-list small">
-                                            <li>
-                                                <i class="fa-solid fa-shield-heart"></i>
-                                                <span>Jika hasilnya risiko tinggi, sebaiknya lakukan pengecekan lanjutan atau konsultasi tenaga medis.</span>
-                                            </li>
-                                            @if(is_numeric($falseNegative) && is_numeric($truePositive))
-                                                <li>
-                                                    <i class="fa-solid fa-chart-simple"></i>
-                                                    <span>Pada data uji, model aktif mendeteksi {{ $truePositive }} data risiko tinggi dan melewatkan {{ $falseNegative }} data risiko tinggi.</span>
-                                                </li>
-                                            @endif
-                                        </ul>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                                </div>
                             </div>
-                        </div>
+                        @else
+                            <p class="soft-copy mb-0">Belum bisa dipakai sampai file model, feature columns, dan metrics tersedia di folder <code>ml-api</code>.</p>
+                        @endif
                     </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="model-card">
-                    <p class="section-kicker">Model Tambahan</p>
-                    <h3 class="h5 fw-bold mb-2">KNN Classifier</h3>
-                    <span class="model-status pending mb-3"><i class="fa-solid fa-clock"></i>UI Ready</span>
-                    <p class="soft-copy mb-0">Sudah ditampilkan sebagai opsi, tetapi belum bisa dipakai sampai artefak model dan API-nya tersedia.</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="model-card">
-                    <p class="section-kicker">Model Tambahan</p>
-                    <h3 class="h5 fw-bold mb-2">SVM Classifier</h3>
-                    <span class="model-status pending mb-3"><i class="fa-solid fa-clock"></i>UI Ready</span>
-                    <p class="soft-copy mb-0">Sudah masuk ke tampilan multi-model, tetapi fungsi prediksinya masih menunggu integrasi backend.</p>
-                </div>
-            </div>
+            @endforeach
         </section>
 
         <section class="action-card">
@@ -613,7 +623,7 @@
                 <div class="col-lg-8">
                     <p class="section-kicker">Siap Mulai</p>
                     <h2 class="fw-bold mb-2">Mulai prediksi sekarang dengan model aktif.</h2>
-                    <p class="soft-copy mb-0">Gunakan hasil prediksi sebagai peringatan awal dan tetap konsultasikan kondisi kesehatan dengan tenaga medis.</p>
+                    <p class="soft-copy mb-0">Gunakan hasil sebagai panduan awal dan konsultasikan kondisi kesehatan dengan tenaga medis bila diperlukan.</p>
                 </div>
                 <div class="col-lg-4 text-lg-end">
                     <a href="{{ route('form') }}" class="btn btn-dark btn-lg w-100">Mulai Prediksi</a>
@@ -623,34 +633,34 @@
 
         <section>
             <p class="section-kicker">Cara Web Bekerja</p>
-            <h2 class="fw-bold mb-4">Alur prediksi dari input sampai riwayat.</h2>
+            <h2 class="fw-bold mb-4">Alur singkat dari input hingga hasil tersimpan.</h2>
             <div class="row g-4">
                 <div class="col-md-3">
                     <div class="step-card">
                         <span class="step-number mb-3">1</span>
                         <h3 class="h6 fw-bold">Register / Login</h3>
-                        <p class="soft-copy mb-0">User masuk ke sistem agar hasil prediksi tersimpan di akun masing-masing.</p>
+                        <p class="soft-copy mb-0">Masuk agar hasil prediksi tersimpan dan bisa dilihat kembali kapan saja.</p>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="step-card">
                         <span class="step-number mb-3">2</span>
                         <h3 class="h6 fw-bold">Isi Data Pasien</h3>
-                        <p class="soft-copy mb-0">Form menerima data usia, kondisi medis, BMI, glukosa, pekerjaan, dan kebiasaan merokok.</p>
+                        <p class="soft-copy mb-0">Isi data usia, kondisi medis, BMI, kadar glukosa, pekerjaan, dan kebiasaan merokok.</p>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="step-card">
                         <span class="step-number mb-3">3</span>
                         <h3 class="h6 fw-bold">Prediksi ML API</h3>
-                        <p class="soft-copy mb-0">Laravel mengirim input ke Flask API, lalu API memprosesnya memakai model aktif yang tersedia.</p>
+                        <p class="soft-copy mb-0">Sistem memproses data dengan model aktif untuk menghasilkan risiko rendah/tinggi.</p>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="step-card">
                         <span class="step-number mb-3">4</span>
                         <h3 class="h6 fw-bold">Simpan History</h3>
-                        <p class="soft-copy mb-0">Hasil prediksi disimpan ke database MySQL dan bisa dilihat kembali.</p>
+                        <p class="soft-copy mb-0">Hasil tersimpan otomatis dan dapat diakses kembali di halaman riwayat.</p>
                     </div>
                 </div>
             </div>
@@ -662,9 +672,8 @@
                     <p class="section-kicker">Dataset</p>
                     <h2 class="fw-bold mb-3">Healthcare Stroke Prediction Dataset</h2>
                     <p class="soft-copy">
-                        Dataset berisi informasi pasien seperti gender, age, hypertension, heart disease,
-                        ever married, work type, residence type, average glucose level, BMI, smoking status,
-                        dan label stroke.
+                        Dataset publik dari Kaggle berisi data kesehatan pasien, seperti usia, tekanan darah,
+                        kadar glukosa, BMI, kebiasaan merokok, serta label stroke.
                     </p>
                     <a class="dataset-link" href="https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset" target="_blank" rel="noopener noreferrer">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i>

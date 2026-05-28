@@ -1,0 +1,1117 @@
+@extends('layouts.app')
+
+@section('content')
+	@php
+		$dataset = $dataset ?? null;
+		$result = $result ?? null;
+		$status = $status ?? 'Belum mulai';
+		$activeInputMode = old('input_mode', 'upload');
+		$summary = $dataset['summary'] ?? ['total_rows' => 0, 'valid_rows' => 0, 'stroke_0' => 0, 'stroke_1' => 0];
+		$isDatasetValid = (bool) ($dataset['is_valid'] ?? false);
+		$statusClass = match ($status) {
+			'Selesai' => 'success',
+			'Gagal', 'Validasi gagal' => 'danger',
+			'Sedang training' => 'warning',
+			'Siap retraining' => 'ready',
+			default => 'idle',
+		};
+		$formatPercent = function ($value) {
+			if (! is_numeric($value)) {
+				return '-';
+			}
+			$value = (float) $value;
+			if ($value <= 1) {
+				$value *= 100;
+			}
+			return number_format($value, 2) . '%';
+		};
+	@endphp
+
+	<style>
+		.retrain-hero {
+			border-radius: 18px;
+			border: 1px solid rgba(180, 83, 9, 0.28);
+			background:
+				radial-gradient(circle at top right, rgba(220, 38, 38, 0.18), transparent 34%),
+				linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(255, 255, 255, 0.96));
+			padding: 1.5rem 1.75rem;
+			box-shadow: 0 18px 36px rgba(15, 32, 50, 0.08);
+		}
+
+		.retrain-card {
+			border-radius: 18px;
+			border: 1px solid rgba(214, 226, 234, 0.95);
+			background: #ffffff;
+			padding: 1.5rem;
+			box-shadow: 0 16px 32px rgba(15, 32, 50, 0.07);
+			height: 100%;
+		}
+
+		.form-section-title {
+			font-weight: 700;
+			color: #0f172a;
+			margin-bottom: 0.75rem;
+		}
+
+		.form-helper {
+			color: #64748b;
+			font-size: 0.85rem;
+		}
+
+		.retrain-card-head {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 1rem;
+			margin-bottom: 1.25rem;
+		}
+
+		.retrain-footer {
+			border-top: 1px solid rgba(148, 163, 184, 0.2);
+			padding-top: 1.25rem;
+		}
+
+		.status-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			border-radius: 999px;
+			font-weight: 800;
+			font-size: 0.8rem;
+			padding: 0.5rem 0.78rem;
+		}
+
+		.status-pill.idle {
+			background: #f1f5f9;
+			color: #475569;
+		}
+
+		.status-pill.ready,
+		.status-pill.success {
+			background: rgba(16, 185, 129, 0.12);
+			color: #047857;
+		}
+
+		.status-pill.warning {
+			background: rgba(245, 158, 11, 0.14);
+			color: #92400e;
+		}
+
+		.status-pill.danger {
+			background: rgba(239, 68, 68, 0.12);
+			color: #b91c1c;
+		}
+
+		.upload-locked {
+			position: relative;
+		}
+
+		.upload-locked::before {
+			content: "";
+			position: absolute;
+			inset: -1px;
+			border-radius: 20px;
+			background: rgba(255, 255, 255, 0.64);
+			backdrop-filter: blur(1px);
+			z-index: 2;
+			display: none;
+		}
+
+		.upload-locked.is-locked::before {
+			display: block;
+		}
+
+		.locked-hint {
+			display: none;
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			z-index: 3;
+			width: min(430px, calc(100% - 2rem));
+			border-radius: 18px;
+			border: 1px solid rgba(185, 28, 28, 0.22);
+			background: #ffffff;
+			box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+			padding: 1.15rem;
+			text-align: center;
+			color: #7f1d1d;
+			font-weight: 800;
+		}
+
+		.upload-locked.is-locked .locked-hint {
+			display: block;
+		}
+
+		.upload-zone {
+			display: grid;
+			place-items: center;
+			border-radius: 18px;
+			border: 2px dashed rgba(185, 28, 28, 0.42);
+			background:
+				radial-gradient(circle at top, rgba(185, 28, 28, 0.08), transparent 42%),
+				linear-gradient(135deg, rgba(254, 242, 242, 0.96), rgba(255, 251, 235, 0.84));
+			padding: 1.85rem 1.45rem;
+			text-align: center;
+			cursor: pointer;
+			transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.upload-zone:hover {
+			border-color: rgba(153, 27, 27, 0.7);
+			box-shadow: 0 18px 34px rgba(185, 28, 28, 0.13);
+			transform: translateY(-1px);
+		}
+
+		.upload-zone input {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.upload-icon-large {
+			width: 58px;
+			height: 58px;
+			border-radius: 18px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: #a31818;
+			color: #ffffff;
+			font-size: 1.35rem;
+			margin-bottom: 0.85rem;
+			box-shadow: 0 16px 30px rgba(153, 27, 27, 0.28);
+		}
+
+		.file-name-badge {
+			display: none;
+			margin-top: 0.85rem;
+			border-radius: 999px;
+			background: rgba(15, 118, 110, 0.12);
+			color: #0f5e57;
+			font-weight: 900;
+			font-size: 0.82rem;
+			padding: 0.45rem 0.7rem;
+			max-width: 100%;
+			overflow-wrap: anywhere;
+		}
+
+		.file-name-badge.is-visible {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+		}
+
+		.form-control,
+		.form-select {
+			border-radius: 12px;
+			border-color: rgba(148, 163, 184, 0.35);
+			padding: 0.7rem 0.9rem;
+		}
+
+		.form-control:focus,
+		.form-select:focus {
+			box-shadow: 0 0 0 0.2rem rgba(185, 28, 28, 0.14);
+			border-color: rgba(185, 28, 28, 0.62);
+		}
+
+		.input-mode-tabs {
+			display: flex;
+			gap: 0.35rem;
+			border-radius: 22px;
+			border: 1px solid rgba(185, 28, 28, 0.18);
+			background: #fff7ed;
+			padding: 0.35rem;
+			margin-bottom: 1.1rem;
+		}
+
+		.mode-tab {
+			flex: 1 1 0;
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			border: 1px solid transparent;
+			border-radius: 18px;
+			background: transparent;
+			color: #7f1d1d;
+			padding: 0.85rem 0.95rem;
+			text-align: left;
+			transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+		}
+
+		.mode-tab:hover {
+			border-color: rgba(185, 28, 28, 0.4);
+			transform: translateY(-1px);
+		}
+
+		.mode-tab.is-active {
+			border-color: rgba(153, 27, 27, 0.62);
+			background:
+				radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 36%),
+				#ffffff;
+			box-shadow: 0 12px 24px rgba(185, 28, 28, 0.1);
+		}
+
+		.mode-tab-icon {
+			width: 44px;
+			height: 44px;
+			border-radius: 16px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(185, 28, 28, 0.1);
+			color: #991b1b;
+			flex: 0 0 auto;
+		}
+
+		.mode-tab.is-active .mode-tab-icon {
+			background: #a31818;
+			color: #ffffff;
+			box-shadow: 0 12px 24px rgba(153, 27, 27, 0.22);
+		}
+
+		.mode-tab-meta {
+			min-width: 0;
+		}
+
+		.mode-tab-title {
+			display: block;
+			font-weight: 900;
+			color: #111827;
+			margin-bottom: 0.1rem;
+		}
+
+		.mode-tab-copy {
+			display: block;
+			color: #64748b;
+			font-size: 0.86rem;
+			line-height: 1.45;
+		}
+
+		.mode-panel {
+			border-radius: 22px;
+			border: 1px solid rgba(185, 28, 28, 0.12);
+			background:
+				linear-gradient(135deg, rgba(255, 247, 237, 0.66), rgba(255, 255, 255, 0.92));
+			padding: 1rem;
+		}
+
+		.mode-panel-head {
+			display: flex;
+			align-items: center;
+			gap: 0.8rem;
+			margin-bottom: 1rem;
+		}
+
+		.mode-panel-icon {
+			width: 46px;
+			height: 46px;
+			border-radius: 16px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: #a31818;
+			color: #ffffff;
+			box-shadow: 0 14px 24px rgba(153, 27, 27, 0.22);
+			flex: 0 0 auto;
+		}
+
+		.mode-panel-title {
+			color: #111827;
+			font-weight: 900;
+			margin: 0;
+		}
+
+		.mode-panel-copy {
+			color: #64748b;
+			margin: 0;
+			line-height: 1.45;
+		}
+
+		.manual-form-grid {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.9rem;
+		}
+
+		.manual-form-grid .full-span {
+			grid-column: 1 / -1;
+		}
+
+		.manual-tip {
+			border-radius: 16px;
+			border: 1px solid rgba(185, 28, 28, 0.18);
+			background: rgba(254, 242, 242, 0.72);
+			color: #7f1d1d;
+			padding: 0.85rem;
+			font-weight: 700;
+			line-height: 1.55;
+		}
+
+		.manual-section {
+			border-radius: 18px;
+			border: 1px solid rgba(148, 163, 184, 0.16);
+			background: rgba(255, 255, 255, 0.82);
+			padding: 1rem;
+			margin-bottom: 1rem;
+		}
+
+		.manual-section:last-of-type {
+			margin-bottom: 1rem;
+		}
+
+		.manual-section-title {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			color: #7f1d1d;
+			font-weight: 900;
+			margin-bottom: 0.85rem;
+		}
+
+		.consent-card {
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr);
+			gap: 0.85rem;
+			align-items: flex-start;
+			border-radius: 18px;
+			border: 1px solid rgba(185, 28, 28, 0.24);
+			background: #fff7ed;
+			padding: 1rem;
+			cursor: pointer;
+			box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+		}
+
+		.consent-card:hover {
+			border-color: rgba(185, 28, 28, 0.42);
+		}
+
+		.consent-checkbox {
+			width: 1.45rem;
+			height: 1.45rem;
+			margin-top: 0.1rem;
+			border: 2px solid #991b1b;
+			cursor: pointer;
+			flex-shrink: 0;
+		}
+
+		.consent-checkbox:checked {
+			background-color: #991b1b;
+			border-color: #991b1b;
+		}
+
+		.consent-title {
+			display: block;
+			color: #111827;
+			font-weight: 900;
+			margin-bottom: 0.25rem;
+		}
+
+		.consent-copy {
+			color: #475569;
+			line-height: 1.6;
+			margin: 0;
+		}
+
+		.gate-modal .modal-content {
+			border: 0;
+			border-radius: 24px;
+			overflow: hidden;
+			box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+		}
+
+		.gate-modal-head {
+			background:
+				radial-gradient(circle at top right, rgba(245, 158, 11, 0.22), transparent 38%),
+				linear-gradient(135deg, #7f1d1d, #991b1b);
+			color: #ffffff;
+			padding: 1.5rem;
+		}
+
+		.gate-icon {
+			width: 54px;
+			height: 54px;
+			border-radius: 18px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(255, 255, 255, 0.14);
+			border: 1px solid rgba(255, 255, 255, 0.22);
+			margin-bottom: 0.85rem;
+			font-size: 1.35rem;
+		}
+
+		.gate-rule {
+			border-radius: 16px;
+			background: #f8fafc;
+			border: 1px solid rgba(148, 163, 184, 0.2);
+			padding: 0.85rem;
+			color: #334155;
+			line-height: 1.55;
+		}
+
+		.model-status-panel {
+			border-radius: 16px;
+			border: 1px solid rgba(185, 28, 28, 0.14);
+			background:
+				radial-gradient(circle at top right, rgba(245, 158, 11, 0.14), transparent 42%),
+				linear-gradient(135deg, rgba(254, 242, 242, 0.9), #ffffff);
+			padding: 1rem;
+		}
+
+		.model-status-list {
+			display: grid;
+			gap: 0.75rem;
+		}
+
+		.model-status-item {
+			display: flex;
+			align-items: center;
+			gap: 0.85rem;
+			border-radius: 18px;
+			border: 1px solid rgba(148, 163, 184, 0.18);
+			background: #ffffff;
+			padding: 0.9rem;
+		}
+
+		.model-status-item.is-ready {
+			border-color: rgba(15, 118, 110, 0.18);
+			background: rgba(240, 253, 250, 0.72);
+		}
+
+		.model-status-item.is-waiting {
+			border-color: rgba(180, 83, 9, 0.2);
+			background: rgba(255, 247, 237, 0.72);
+			opacity: 0.82;
+		}
+
+		.model-status-icon {
+			width: 42px;
+			height: 42px;
+			border-radius: 14px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: #0f766e;
+			color: #ffffff;
+			flex: 0 0 auto;
+		}
+
+		.model-status-item.is-waiting .model-status-icon {
+			background: #92400e;
+		}
+
+		.model-status-title {
+			color: #0f172a;
+			font-weight: 900;
+			line-height: 1.2;
+		}
+
+		.model-status-copy {
+			color: #64748b;
+			font-size: 0.86rem;
+		}
+
+		.model-grid {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.75rem;
+		}
+
+		.model-choice {
+			position: relative;
+			border: 1px solid rgba(148, 163, 184, 0.28);
+			border-radius: 16px;
+			background: #f8fafc;
+			padding: 1rem;
+			min-height: 120px;
+		}
+
+		.model-choice input {
+			position: absolute;
+			inset: 0;
+			opacity: 0;
+			cursor: pointer;
+		}
+
+		.model-choice:has(input:checked) {
+			border-color: rgba(15, 118, 110, 0.48);
+			background: linear-gradient(135deg, rgba(223, 247, 242, 0.9), #ffffff);
+			box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
+		}
+
+		.model-choice.disabled {
+			opacity: 0.65;
+			cursor: not-allowed;
+		}
+
+		.model-choice.disabled input {
+			cursor: not-allowed;
+		}
+
+		.metric-grid {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 0.75rem;
+		}
+
+		.metric-box,
+		.summary-box {
+			border-radius: 16px;
+			border: 1px solid rgba(148, 163, 184, 0.22);
+			background: #f8fafc;
+			padding: 1rem;
+		}
+
+		.metric-label,
+		.summary-label {
+			color: #64748b;
+			font-weight: 800;
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+		}
+
+		.metric-value,
+		.summary-value {
+			color: #0f172a;
+			font-size: 1.45rem;
+			font-weight: 900;
+		}
+
+		.error-table td,
+		.preview-table td,
+		.preview-table th {
+			white-space: nowrap;
+			font-size: 0.85rem;
+		}
+
+		@media (max-width: 991.98px) {
+			.input-mode-tabs {
+				flex-direction: column;
+			}
+
+			.manual-form-grid,
+			.model-grid,
+			.metric-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+
+	<div class="retrain-hero mb-4">
+		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+			<div>
+				<p class="eyebrow mb-2">Retraining Model</p>
+				<h1 class="h4 fw-bold mb-2"><i class="fa-solid fa-rotate me-2"></i>Latih ulang model dari dataset baru.</h1>
+				<p class="text-muted mb-0">
+					Unggah dataset sesuai template, validasi isi file, lalu jalankan retraining untuk model yang tersedia.
+				</p>
+			</div>
+			<span class="status-pill {{ $statusClass }}">
+				<i class="fa-solid {{ $statusClass === 'danger' ? 'fa-circle-exclamation' : ($statusClass === 'success' ? 'fa-circle-check' : 'fa-clock') }}"></i>
+				{{ $status }}
+			</span>
+		</div>
+	</div>
+
+	<div class="modal fade gate-modal" id="retrainingGateModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+		<div class="modal-dialog modal-lg modal-dialog-centered">
+			<div class="modal-content">
+				<div class="gate-modal-head">
+					<div class="gate-icon">
+						<i class="fa-solid fa-user-doctor"></i>
+					</div>
+					<h2 class="h4 fw-bold mb-2">Peringatan sebelum masuk menu Retraining</h2>
+					<p class="mb-0 text-white-50">
+						Data yang diupload di halaman ini akan dipakai untuk melatih ulang model. Pastikan label stroke berasal dari sumber medis atau dataset kesehatan terpercaya.
+					</p>
+				</div>
+				<div class="modal-body p-4">
+					<div class="row g-3 mb-3">
+						<div class="col-md-6">
+							<div class="gate-rule h-100">
+								<div class="fw-bold text-success mb-1"><i class="fa-solid fa-circle-check me-1"></i>Data yang boleh dipakai</div>
+								Diagnosis dokter, rekam medis, data rumah sakit, hasil pemeriksaan medis, atau dataset kesehatan resmi/terpercaya.
+							</div>
+						</div>
+						<div class="col-md-6">
+							<div class="gate-rule h-100">
+								<div class="fw-bold text-danger mb-1"><i class="fa-solid fa-circle-xmark me-1"></i>Data yang tidak boleh dipakai</div>
+								Data dummy, asal isi, hasil tebakan, atau hasil prediksi dari website ini sebagai label <code>stroke</code>.
+							</div>
+						</div>
+					</div>
+					<div class="alert alert-warning mb-0">
+						<i class="fa-solid fa-triangle-exclamation me-1"></i>
+						Jika label stroke tidak benar, model baru bisa belajar pola yang salah dan kualitas prediksi berikutnya bisa rusak.
+					</div>
+				</div>
+				<div class="modal-footer p-4 pt-0 border-0">
+					<button type="button" class="btn btn-dark btn-lg w-100" id="confirmRetrainingGate">
+						Saya paham, buka form upload
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	@if(session('success'))
+		<div class="alert alert-success">{{ session('success') }}</div>
+	@endif
+
+	@if($errors->any())
+		<div class="alert alert-danger">
+			<ul class="mb-0">
+				@foreach($errors->all() as $error)
+					<li>{{ $error }}</li>
+				@endforeach
+			</ul>
+		</div>
+	@endif
+
+	<div class="row g-4">
+		<div class="col-lg-8">
+			<div class="retrain-card upload-locked is-locked" id="uploadRetrainingCard">
+				<div class="locked-hint">
+					<i class="fa-solid fa-lock me-1"></i>
+					Konfirmasi pop-up terlebih dahulu untuk membuka form upload.
+				</div>
+				<div class="retrain-card-head">
+					<div>
+						<h6 class="form-section-title"><i class="fa-solid fa-database me-2"></i>Input Dataset Retraining</h6>
+						<p class="form-helper mb-0">Pilih upload file atau isi satu data diagnosis secara manual.</p>
+					</div>
+					<a href="{{ asset('templates/stroke-retraining-template.csv') }}" class="btn btn-outline-secondary" download>
+						<i class="fa-solid fa-file-csv me-2"></i>Download Template
+					</a>
+				</div>
+
+				<div class="input-mode-tabs" role="tablist" aria-label="Pilihan input retraining">
+					<button type="button" class="mode-tab {{ $activeInputMode !== 'manual' ? 'is-active' : '' }}" data-mode-tab="upload">
+						<span class="mode-tab-icon"><i class="fa-solid fa-file-arrow-up"></i></span>
+						<span class="mode-tab-meta">
+							<span class="mode-tab-title">Upload File</span>
+							<span class="mode-tab-copy">Banyak data lewat CSV/XLSX.</span>
+						</span>
+					</button>
+					<button type="button" class="mode-tab {{ $activeInputMode === 'manual' ? 'is-active' : '' }}" data-mode-tab="manual">
+						<span class="mode-tab-icon"><i class="fa-solid fa-pen-to-square"></i></span>
+						<span class="mode-tab-meta">
+							<span class="mode-tab-title">Isi Manual</span>
+							<span class="mode-tab-copy">Satu data berlabel asli.</span>
+						</span>
+					</button>
+				</div>
+
+				<div class="mode-panel {{ $activeInputMode === 'manual' ? 'd-none' : '' }}" data-mode-panel="upload">
+					<div class="mode-panel-head">
+						<span class="mode-panel-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+						<div>
+							<h3 class="mode-panel-title h6">Upload dataset diagnosis</h3>
+							<p class="mode-panel-copy">Gunakan template agar header file terbaca dengan benar.</p>
+						</div>
+					</div>
+					<form action="{{ route('retraining.upload') }}" method="POST" enctype="multipart/form-data">
+						@csrf
+						<input type="hidden" name="input_mode" value="upload">
+						<div class="mb-3">
+							<label class="upload-zone" for="retraining_file">
+								<input id="retraining_file" type="file" name="retraining_file" accept=".csv,.txt,.xlsx" required disabled data-gated-control>
+								<span>
+									<span class="upload-icon-large"><i class="fa-solid fa-file-medical"></i></span>
+									<span class="h5 fw-bold d-block mb-2">Pilih dataset diagnosis asli</span>
+									<span class="text-muted d-block">Format CSV/XLSX, maksimal 5 MB dan 5.000 baris.</span>
+									<span class="file-name-badge" id="retrainingFileName">
+										<i class="fa-solid fa-file-lines"></i>
+										<span></span>
+									</span>
+								</span>
+							</label>
+							<div class="form-text mt-2">CSV lebih disarankan untuk dataset besar karena lebih ringan diproses.</div>
+						</div>
+						<label class="consent-card mb-3" for="upload_data_consent">
+							<input class="form-check-input consent-checkbox" id="upload_data_consent" type="checkbox" name="data_consent" value="1" required disabled data-gated-control>
+							<span>
+								<span class="consent-title">Saya bertanggung jawab atas sumber data ini</span>
+								<p class="consent-copy">
+									Label <code>stroke</code> pada file ini berasal dari diagnosis/pemeriksaan medis, rekam medis, rumah sakit, dokter, atau dataset kesehatan terpercaya. Data ini bukan hasil prediksi website dan bukan data asal isi.
+								</p>
+							</span>
+						</label>
+						<div class="retrain-footer d-flex flex-wrap justify-content-between align-items-center gap-3">
+							<p class="mb-0 text-muted">Data valid akan disiapkan untuk proses retraining.</p>
+							<button type="submit" class="btn btn-dark px-4" disabled data-gated-control>
+								<i class="fa-solid fa-shield-check me-2"></i>Upload & Validasi
+							</button>
+						</div>
+					</form>
+				</div>
+
+				<div class="mode-panel {{ $activeInputMode === 'manual' ? '' : 'd-none' }}" data-mode-panel="manual">
+					<div class="mode-panel-head">
+						<span class="mode-panel-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+						<div>
+							<h3 class="mode-panel-title h6">Isi satu data diagnosis</h3>
+							<p class="mode-panel-copy">Cocok untuk menambahkan satu baris data retraining tanpa membuat file CSV.</p>
+						</div>
+					</div>
+					<form action="{{ route('retraining.manual') }}" method="POST">
+						@csrf
+						<input type="hidden" name="input_mode" value="manual">
+						<div class="manual-tip mb-3">
+							<i class="fa-solid fa-triangle-exclamation me-1"></i>
+							Input manual tetap wajib punya label <code>stroke</code> asli dari diagnosis/sumber terpercaya.
+						</div>
+						<div class="manual-section">
+							<div class="manual-section-title"><i class="fa-solid fa-user"></i>Data Pasien</div>
+							<div class="manual-form-grid">
+								<div>
+									<label class="form-label" for="manual_gender">Gender</label>
+									<select class="form-select" id="manual_gender" name="gender" required disabled data-gated-control>
+										@foreach(['Male' => 'Male', 'Female' => 'Female', 'Other' => 'Other'] as $value => $label)
+											<option value="{{ $value }}" @selected(old('gender') === $value)>{{ $label }}</option>
+										@endforeach
+									</select>
+								</div>
+								<div>
+									<label class="form-label" for="manual_age">Age</label>
+									<input class="form-control" id="manual_age" type="number" name="age" min="0" max="120" step="0.1" value="{{ old('age') }}" required disabled data-gated-control>
+								</div>
+								<div>
+									<label class="form-label" for="manual_ever_married">Ever Married</label>
+									<select class="form-select" id="manual_ever_married" name="ever_married" required disabled data-gated-control>
+										<option value="Yes" @selected(old('ever_married') === 'Yes')>Yes</option>
+										<option value="No" @selected(old('ever_married') === 'No')>No</option>
+									</select>
+								</div>
+								<div>
+									<label class="form-label" for="manual_work_type">Work Type</label>
+									<select class="form-select" id="manual_work_type" name="work_type" required disabled data-gated-control>
+										@foreach(['Private', 'Self-employed', 'Govt_job', 'children', 'Never_worked'] as $value)
+											<option value="{{ $value }}" @selected(old('work_type') === $value)>{{ $value }}</option>
+										@endforeach
+									</select>
+								</div>
+								<div class="full-span">
+									<label class="form-label" for="manual_residence_type">Residence Type</label>
+									<select class="form-select" id="manual_residence_type" name="Residence_type" required disabled data-gated-control>
+										<option value="Urban" @selected(old('Residence_type') === 'Urban')>Urban</option>
+										<option value="Rural" @selected(old('Residence_type') === 'Rural')>Rural</option>
+									</select>
+								</div>
+							</div>
+						</div>
+
+						<div class="manual-section">
+							<div class="manual-section-title"><i class="fa-solid fa-notes-medical"></i>Kondisi Medis</div>
+							<div class="manual-form-grid">
+								<div>
+									<label class="form-label" for="manual_hypertension">Hypertension</label>
+									<select class="form-select" id="manual_hypertension" name="hypertension" required disabled data-gated-control>
+										<option value="0" @selected(old('hypertension') === '0')>0 - Tidak</option>
+										<option value="1" @selected(old('hypertension') === '1')>1 - Ya</option>
+									</select>
+								</div>
+								<div>
+									<label class="form-label" for="manual_heart_disease">Heart Disease</label>
+									<select class="form-select" id="manual_heart_disease" name="heart_disease" required disabled data-gated-control>
+										<option value="0" @selected(old('heart_disease') === '0')>0 - Tidak</option>
+										<option value="1" @selected(old('heart_disease') === '1')>1 - Ya</option>
+									</select>
+								</div>
+								<div>
+									<label class="form-label" for="manual_avg_glucose_level">Avg Glucose Level</label>
+									<input class="form-control" id="manual_avg_glucose_level" type="number" name="avg_glucose_level" min="40" max="400" step="0.01" value="{{ old('avg_glucose_level') }}" required disabled data-gated-control>
+								</div>
+								<div>
+									<label class="form-label" for="manual_bmi">BMI</label>
+									<input class="form-control" id="manual_bmi" type="number" name="bmi" min="10" max="80" step="0.01" value="{{ old('bmi') }}" required disabled data-gated-control>
+								</div>
+								<div class="full-span">
+									<label class="form-label" for="manual_smoking_status">Smoking Status</label>
+									<select class="form-select" id="manual_smoking_status" name="smoking_status" required disabled data-gated-control>
+										@foreach(['formerly smoked', 'never smoked', 'smokes', 'Unknown'] as $value)
+											<option value="{{ $value }}" @selected(old('smoking_status') === $value)>{{ $value }}</option>
+										@endforeach
+									</select>
+								</div>
+							</div>
+						</div>
+
+						<div class="manual-section">
+							<div class="manual-section-title"><i class="fa-solid fa-stethoscope"></i>Label Diagnosis</div>
+							<div>
+								<label class="form-label text-danger" for="manual_stroke">Label Stroke Asli</label>
+								<select class="form-select border-danger" id="manual_stroke" name="stroke" required disabled data-gated-control>
+									<option value="0" @selected(old('stroke') === '0')>0 - Tidak stroke</option>
+									<option value="1" @selected(old('stroke') === '1')>1 - Stroke</option>
+								</select>
+								<div class="form-text">Ini harus label asli, bukan hasil prediksi sistem.</div>
+							</div>
+						</div>
+						<label class="consent-card mb-3" for="manual_data_consent">
+							<input class="form-check-input consent-checkbox" id="manual_data_consent" type="checkbox" name="data_consent" value="1" required disabled data-gated-control>
+							<span>
+								<span class="consent-title">Saya bertanggung jawab atas sumber data manual ini</span>
+								<p class="consent-copy">
+									Label <code>stroke</code> yang saya isi berasal dari diagnosis/pemeriksaan medis, rekam medis, rumah sakit, dokter, atau dataset kesehatan terpercaya.
+								</p>
+							</span>
+						</label>
+						<div class="retrain-footer d-flex flex-wrap justify-content-between align-items-center gap-3">
+							<p class="mb-0 text-muted">Data manual akan disimpan sebagai satu baris dataset retraining.</p>
+							<button type="submit" class="btn btn-dark px-4" disabled data-gated-control>
+								<i class="fa-solid fa-floppy-disk me-2"></i>Simpan & Validasi
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+
+		<div class="col-lg-4">
+			<div class="retrain-card model-status-panel">
+				<p class="eyebrow mb-2">Model Retraining</p>
+				<h6 class="form-section-title">Model yang tersedia</h6>
+				<p class="form-helper mb-3">Pilih model setelah dataset berhasil lolos validasi.</p>
+				<div class="model-status-list">
+					@foreach($models as $model)
+						<div class="model-status-item {{ $model['available'] ? 'is-ready' : 'is-waiting' }}">
+							<span class="model-status-icon">
+								<i class="fa-solid {{ $model['icon'] }}"></i>
+							</span>
+							<span>
+								<span class="model-status-title d-block">{{ $model['name'] }}</span>
+								<span class="model-status-copy">{{ $model['available'] ? 'Siap untuk retraining' : 'Belum tersedia' }}</span>
+							</span>
+						</div>
+					@endforeach
+				</div>
+			</div>
+		</div>
+	</div>
+
+	@if($dataset)
+		<div class="row g-4 mt-1">
+			<div class="col-lg-5">
+				<div class="retrain-card">
+					<h6 class="form-section-title"><i class="fa-solid fa-chart-simple me-2"></i>Ringkasan Validasi</h6>
+					<div class="row g-3">
+						<div class="col-6">
+							<div class="summary-box">
+								<div class="summary-label">Total Baris</div>
+								<div class="summary-value">{{ $summary['total_rows'] ?? 0 }}</div>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="summary-box">
+								<div class="summary-label">Valid</div>
+								<div class="summary-value text-success">{{ $summary['valid_rows'] ?? 0 }}</div>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="summary-box">
+								<div class="summary-label">Stroke = 0</div>
+								<div class="summary-value">{{ $summary['stroke_0'] ?? 0 }}</div>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="summary-box">
+								<div class="summary-label">Stroke = 1</div>
+								<div class="summary-value text-danger">{{ $summary['stroke_1'] ?? 0 }}</div>
+							</div>
+						</div>
+					</div>
+					<p class="text-muted small mt-3 mb-0">File: {{ $dataset['uploaded_name'] ?? '-' }}</p>
+				</div>
+			</div>
+
+			<div class="col-lg-7">
+				<div class="retrain-card">
+					<h6 class="form-section-title"><i class="fa-solid fa-table me-2"></i>Preview Dataset</h6>
+					<div class="table-responsive">
+						<table class="table table-sm preview-table align-middle">
+							<thead>
+								<tr>
+									@foreach(['gender','age','hypertension','heart_disease','ever_married','work_type','Residence_type','avg_glucose_level','bmi','smoking_status','stroke'] as $column)
+										<th>{{ $column }}</th>
+									@endforeach
+								</tr>
+							</thead>
+							<tbody>
+								@foreach(($dataset['preview'] ?? []) as $row)
+									<tr>
+										@foreach(['gender','age','hypertension','heart_disease','ever_married','work_type','Residence_type','avg_glucose_level','bmi','smoking_status','stroke'] as $column)
+											<td>{{ $row[$column] ?? '-' }}</td>
+										@endforeach
+									</tr>
+								@endforeach
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		@if(! $isDatasetValid)
+			<div class="retrain-card mt-4">
+				<h6 class="form-section-title text-danger"><i class="fa-solid fa-circle-exclamation me-2"></i>Validasi Gagal</h6>
+				<div class="table-responsive">
+					<table class="table table-sm error-table">
+						<thead>
+							<tr>
+								<th>Baris</th>
+								<th>Kolom</th>
+								<th>Alasan</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach(($dataset['errors'] ?? []) as $error)
+								<tr>
+									<td>{{ $error['row'] }}</td>
+									<td>{{ $error['column'] }}</td>
+									<td>{{ $error['message'] }}</td>
+								</tr>
+							@endforeach
+						</tbody>
+					</table>
+				</div>
+			</div>
+		@else
+			<div class="retrain-card mt-4">
+				<form action="{{ route('retraining.start') }}" method="POST">
+					@csrf
+					<div class="retrain-card-head">
+						<div>
+							<h6 class="form-section-title"><i class="fa-solid fa-rotate me-2"></i>Mulai Retraining</h6>
+							<p class="form-helper mb-0">Pilih model yang ingin dilatih ulang. SVM belum tersedia pada MVP ini.</p>
+						</div>
+						<button type="submit" class="btn btn-dark px-4">
+							<i class="fa-solid fa-rotate me-2"></i>Mulai Retraining
+						</button>
+					</div>
+
+					<div class="model-grid">
+						@foreach($models as $key => $model)
+							<label class="model-choice {{ ! $model['available'] ? 'disabled' : '' }}">
+								<input type="checkbox" name="models[]" value="{{ $key }}" @checked($model['available'] && $key !== 'svm') @disabled(! $model['available'])>
+								<div class="d-flex align-items-center gap-2 mb-2">
+									<span class="status-badge">
+										<i class="fa-solid {{ $model['icon'] }}"></i>
+										{{ $model['name'] }}
+									</span>
+								</div>
+								<p class="text-muted small mb-0">{{ $model['available'] ? 'Siap dilatih ulang.' : 'Belum tersedia untuk retraining.' }}</p>
+							</label>
+						@endforeach
+					</div>
+				</form>
+			</div>
+		@endif
+	@endif
+
+	@if($result)
+		<div class="retrain-card mt-4">
+			<h6 class="form-section-title"><i class="fa-solid fa-square-poll-vertical me-2"></i>Hasil Retraining</h6>
+			@if(($result['status'] ?? null) === 'error')
+				<div class="alert alert-danger mb-0">{{ $result['message'] ?? 'Retraining gagal.' }}</div>
+			@else
+				<p class="text-muted">Backup model lama: <code>{{ $result['backup_dir'] ?? '-' }}</code></p>
+				@foreach(($result['models'] ?? []) as $modelKey => $modelResult)
+					@php
+						$metrics = $modelResult['metrics'] ?? [];
+						$strokeMetrics = $metrics['classification_report']['1'] ?? [];
+						$cm = $metrics['confusion_matrix'] ?? [[0, 0], [0, 0]];
+						$falseNegative = $cm[1][0] ?? 0;
+					@endphp
+					<div class="border rounded-4 p-3 mb-3">
+						<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+							<h3 class="h6 fw-bold mb-0">{{ $modelResult['model_name'] ?? $modelKey }}</h3>
+							<span class="status-pill success"><i class="fa-solid fa-circle-check"></i>Berhasil</span>
+						</div>
+						<div class="metric-grid">
+							<div class="metric-box">
+								<div class="metric-label">Accuracy</div>
+								<div class="metric-value">{{ $formatPercent($metrics['accuracy'] ?? null) }}</div>
+							</div>
+							<div class="metric-box">
+								<div class="metric-label">Recall Stroke</div>
+								<div class="metric-value text-success">{{ $formatPercent($strokeMetrics['recall'] ?? null) }}</div>
+							</div>
+							<div class="metric-box">
+								<div class="metric-label">F1 Stroke</div>
+								<div class="metric-value">{{ $formatPercent($strokeMetrics['f1-score'] ?? null) }}</div>
+							</div>
+							<div class="metric-box">
+								<div class="metric-label">False Negative</div>
+								<div class="metric-value text-danger">{{ $falseNegative }}</div>
+							</div>
+						</div>
+					</div>
+				@endforeach
+			@endif
+		</div>
+	@endif
+
+	<script>
+		window.addEventListener('DOMContentLoaded', () => {
+			const gateModalElement = document.getElementById('retrainingGateModal');
+			const confirmGateButton = document.getElementById('confirmRetrainingGate');
+			const uploadCard = document.getElementById('uploadRetrainingCard');
+			const fileInput = document.getElementById('retraining_file');
+			const gatedControls = document.querySelectorAll('[data-gated-control]');
+			const fileNameBadge = document.getElementById('retrainingFileName');
+			const fileNameText = fileNameBadge?.querySelector('span');
+			const modeTabs = document.querySelectorAll('[data-mode-tab]');
+			const modePanels = document.querySelectorAll('[data-mode-panel]');
+
+			const unlockUploadForm = () => {
+				uploadCard?.classList.remove('is-locked');
+				gatedControls.forEach((control) => {
+					control.disabled = false;
+				});
+			};
+
+			const activateMode = (mode) => {
+				modeTabs.forEach((tab) => {
+					tab.classList.toggle('is-active', tab.dataset.modeTab === mode);
+				});
+
+				modePanels.forEach((panel) => {
+					panel.classList.toggle('d-none', panel.dataset.modePanel !== mode);
+				});
+			};
+
+			if (gateModalElement && window.bootstrap) {
+				const modal = new bootstrap.Modal(gateModalElement, {
+					backdrop: 'static',
+					keyboard: false,
+				});
+				modal.show();
+
+				confirmGateButton?.addEventListener('click', () => {
+					unlockUploadForm();
+					modal.hide();
+				});
+			} else {
+				unlockUploadForm();
+			}
+
+			modeTabs.forEach((tab) => {
+				tab.addEventListener('click', () => {
+					activateMode(tab.dataset.modeTab);
+				});
+			});
+
+			fileInput?.addEventListener('change', () => {
+				const file = fileInput.files?.[0];
+				if (!file || !fileNameBadge || !fileNameText) return;
+				fileNameText.textContent = file.name;
+				fileNameBadge.classList.add('is-visible');
+			});
+		});
+	</script>
+@endsection

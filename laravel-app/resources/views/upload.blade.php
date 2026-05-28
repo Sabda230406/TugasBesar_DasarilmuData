@@ -2,7 +2,11 @@
 
 @section('content')
 	@php
-		$modelName = $modelMetrics['model_name'] ?? 'Decision Tree';
+		$modelOptions = $models ?? [];
+		$selectedModelKey = old('model', $selectedModelKey ?? array_key_first($modelOptions) ?? 'decision_tree');
+		$selectedModel = $modelOptions[$selectedModelKey] ?? ($modelOptions ? reset($modelOptions) : null);
+		$modelName = $selectedModel['name'] ?? $modelMetrics['model_name'] ?? 'Decision Tree';
+		$readyCount = count(array_filter($modelOptions, fn ($model) => $model['available'] ?? false));
 	@endphp
 
 	<style>
@@ -280,7 +284,10 @@
 				<p class="mb-0 text-muted">Gunakan file CSV, XLSX, atau XLS untuk memproses banyak pasien sekaligus.</p>
 			</div>
 			<div class="text-end">
-				<span class="status-badge"><i class="fa-solid fa-tree me-1"></i>{{ $modelName }} Aktif</span>
+				<span class="status-badge" id="activeModelBadge">
+					<i id="activeModelIcon" class="fa-solid {{ $selectedModel['icon'] ?? 'fa-brain' }} me-1"></i>
+					<span id="activeModelName">{{ $modelName }}</span> Aktif
+				</span>
 			</div>
 		</div>
 	</div>
@@ -303,41 +310,32 @@
 				<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
 					<div>
 						<div class="form-label fw-bold mb-1">Pilih Model Prediksi</div>
-						<div class="form-helper">Model tambahan sudah muncul di tampilan, tapi belum aktif untuk prediksi.</div>
+						<div class="form-helper">Model yang dipilih akan dipakai untuk seluruh baris valid dalam file.</div>
 					</div>
 					<span class="model-note">
 						<i class="fa-solid fa-circle-info"></i>
-						Prediksi saat ini masih memakai Decision Tree.
+						{{ $readyCount }} model siap dipakai
 					</span>
 				</div>
 				<div class="model-options" role="radiogroup" aria-label="Pilih Model Prediksi">
-					<label class="model-option is-active" for="upload_model_decision_tree">
-						<input id="upload_model_decision_tree" type="radio" name="model" value="decision_tree" checked>
-						<span class="model-option-icon"><i class="fa-solid fa-tree"></i></span>
-						<span>
-							<span class="model-option-title">Decision Tree</span>
-							<span class="model-option-meta">Model aktif sekarang</span>
-						</span>
-						<span class="model-option-badge">Aktif</span>
-					</label>
-					<label class="model-option is-disabled" for="upload_model_knn">
-						<input id="upload_model_knn" type="radio" name="model" value="knn" disabled>
-						<span class="model-option-icon"><i class="fa-solid fa-diagram-project"></i></span>
-						<span>
-							<span class="model-option-title">KNN</span>
-							<span class="model-option-meta">Belum ada artefak model</span>
-						</span>
-						<span class="model-option-badge">Belum aktif</span>
-					</label>
-					<label class="model-option is-disabled" for="upload_model_svm">
-						<input id="upload_model_svm" type="radio" name="model" value="svm" disabled>
-						<span class="model-option-icon"><i class="fa-solid fa-vector-square"></i></span>
-						<span>
-							<span class="model-option-title">SVM</span>
-							<span class="model-option-meta">Belum ada artefak model</span>
-						</span>
-						<span class="model-option-badge">Belum aktif</span>
-					</label>
+					@foreach($modelOptions as $key => $model)
+						@php
+							$isAvailable = $model['available'] ?? false;
+							$isSelected = $selectedModelKey === $key && $isAvailable;
+						@endphp
+						<label class="model-option {{ $isSelected ? 'is-active' : '' }} {{ ! $isAvailable ? 'is-disabled' : '' }}" for="upload_model_{{ $key }}">
+							<input id="upload_model_{{ $key }}" type="radio" name="model" value="{{ $key }}"
+								data-model-name="{{ $model['name'] ?? $model['label'] }}"
+								data-model-icon="{{ $model['icon'] ?? 'fa-brain' }}"
+								@checked($isSelected) @disabled(! $isAvailable)>
+							<span class="model-option-icon"><i class="fa-solid {{ $model['icon'] ?? 'fa-brain' }}"></i></span>
+							<span>
+								<span class="model-option-title">{{ $model['name'] ?? $model['label'] }}</span>
+								<span class="model-option-meta">{{ $model['meta'] ?? '-' }}</span>
+							</span>
+							<span class="model-option-badge">{{ $model['status_label'] ?? ($isAvailable ? 'Siap' : 'Belum aktif') }}</span>
+						</label>
+					@endforeach
 				</div>
 			</div>
 		</div>
@@ -422,6 +420,22 @@
 		['dragleave', 'drop'].forEach((eventName) => {
 			dropzone?.addEventListener(eventName, () => {
 				dropzone.classList.remove('is-dragover');
+			});
+		});
+
+		document.querySelectorAll('input[name="model"]').forEach((modelInput) => {
+			modelInput.addEventListener('change', () => {
+				document.querySelectorAll('.model-option').forEach((option) => option.classList.remove('is-active'));
+				modelInput.closest('.model-option')?.classList.add('is-active');
+
+				const activeModelName = document.getElementById('activeModelName');
+				const activeModelIcon = document.getElementById('activeModelIcon');
+				if (activeModelName) {
+					activeModelName.textContent = modelInput.dataset.modelName || 'Model';
+				}
+				if (activeModelIcon) {
+					activeModelIcon.className = `fa-solid ${modelInput.dataset.modelIcon || 'fa-brain'} me-1`;
+				}
 			});
 		});
 	</script>
