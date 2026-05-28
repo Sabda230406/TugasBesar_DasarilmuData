@@ -6,10 +6,14 @@
         $selectedModelKey = $selectedModelKey ?? array_key_first($modelOptions) ?? 'decision_tree';
         $selectedModel = $modelOptions[$selectedModelKey] ?? ($modelOptions ? reset($modelOptions) : null);
         $modelMetrics = $selectedModel['metrics'] ?? $modelMetrics;
-        $modelName = $selectedModel['name'] ?? $modelMetrics['model_name'] ?? 'Decision Tree';
         $readyModels = array_filter($modelOptions, fn ($model) => $model['available'] ?? false);
         $readyCount = count($readyModels);
-        $readyModelNames = $readyModels ? implode(', ', array_map(fn ($model) => $model['name'] ?? $model['label'], $readyModels)) : 'Belum tersedia';
+        $totalModelCount = count($modelOptions);
+        $allModelNames = $modelOptions ? implode(', ', array_map(fn ($model) => $model['label'] ?? $model['name'], $modelOptions)) : 'Decision Tree, KNN, SVM';
+        $modelStatusSummary = $readyCount . ' Model Siap';
+        if ($totalModelCount > $readyCount) {
+            $modelStatusSummary .= ', ' . ($totalModelCount - $readyCount) . ' Belum Aktif';
+        }
         $formatPercent = function ($value) {
             if (! is_numeric($value)) {
                 return null;
@@ -433,7 +437,7 @@
                         <p class="lead text-white-50 mb-4">
                             Web ini membantu melakukan screening awal risiko stroke berdasarkan data kesehatan,
                             gaya hidup, dan riwayat medis pengguna. Sistem disiapkan untuk beberapa model machine
-                            learning, dengan satu model aktif yang tersambung ke API prediksi.
+                            learning seperti Decision Tree, KNN, dan SVM.
                         </p>
                         <div class="d-flex flex-wrap gap-2">
                             <a href="{{ route('form') }}" class="btn btn-light btn-lg fw-bold px-4">Mulai Prediksi</a>
@@ -450,12 +454,8 @@
                                 <span>Healthcare Stroke</span>
                             </div>
                             <div class="hero-list-item">
-                                <span>Model Utama</span>
-                                <span>{{ $modelName }}</span>
-                            </div>
-                            <div class="hero-list-item">
-                                <span>Model Tersedia</span>
-                                <span>{{ $readyModelNames }}</span>
+                                <span>Model</span>
+                                <span>{{ $allModelNames }}</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Mode Prediksi</span>
@@ -463,7 +463,7 @@
                             </div>
                             <div class="hero-list-item">
                                 <span>Status</span>
-                                <span>{{ $readyCount }} Model Siap</span>
+                                <span>{{ $modelStatusSummary }}</span>
                             </div>
                             <div class="hero-list-item">
                                 <span>Output</span>
@@ -490,7 +490,7 @@
                 <div class="quick-stat">
                     <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
                     <h3 class="h6 fw-bold mb-2">Model yang Dipakai</h3>
-                    <p class="soft-copy mb-0">Saat ini {{ $readyModelNames }} aktif. Model lain akan muncul otomatis saat siap.</p>
+                    <p class="soft-copy mb-0">Sistem disiapkan untuk {{ $allModelNames }}. Model yang siap akan aktif otomatis untuk prediksi.</p>
                 </div>
             </div>
             <div class="col-md-4">
@@ -541,14 +541,14 @@
                 @endphp
                 <div class="col-md-4">
                     <div class="model-card">
-                        <p class="section-kicker">{{ $isSelected ? 'Model Utama' : ($isAvailable ? 'Model Siap' : 'Model Tambahan') }}</p>
+                        <p class="section-kicker">{{ $isAvailable ? 'Model Siap' : 'Model Tambahan' }}</p>
                         <h3 class="h5 fw-bold mb-2">{{ $modelLabel }} Classifier</h3>
                         <span class="model-status {{ $isAvailable ? 'active' : 'pending' }} mb-3">
                             <i class="fa-solid {{ $isAvailable ? 'fa-circle-check' : 'fa-clock' }}"></i>{{ $model['status_label'] ?? '-' }}
                         </span>
                         @if($isAvailable)
                             <p class="soft-copy mb-3">
-                                {{ $isSelected ? 'Model utama' : 'Model ini' }} tersambung ke Flask ML API dan bisa dipakai untuk prediksi satu pasien maupun banyak data sekaligus.
+                                Model ini tersambung ke Flask ML API dan bisa dipakai untuk prediksi satu pasien maupun banyak data sekaligus.
                             </p>
                             <button class="btn btn-outline-dark model-detail-toggle w-100" type="button" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
                                 <i class="fa-solid fa-circle-info me-1"></i>
