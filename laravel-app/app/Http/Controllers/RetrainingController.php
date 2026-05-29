@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RetrainingDataset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -11,6 +13,9 @@ use Throwable;
 
 class RetrainingController extends Controller
 {
+	private const MIN_TOTAL_ROWS = 50;
+	private const MIN_CLASS_ROWS = 10;
+
 	private const REQUIRED_COLUMNS = [
 		'gender',
 		'age',
@@ -35,11 +40,16 @@ class RetrainingController extends Controller
 
 	public function index()
 	{
+		$models = $this->modelOptions();
+		$pool = $this->poolSummary($models);
+
 		return view('retraining', [
 			'dataset' => session('retraining_dataset'),
 			'result' => session('retraining_result'),
-			'status' => session('retraining_status', 'Belum mulai'),
-			'models' => $this->modelOptions(),
+			'status' => $pool['status_label'],
+			'models' => $models,
+			'pool' => $pool,
+			'datasets' => RetrainingDataset::latest()->limit(20)->get(),
 		]);
 	}
 
@@ -52,48 +62,48 @@ class RetrainingController extends Controller
 			'data_consent.accepted' => 'Centang pernyataan bahwa label stroke berasal dari diagnosis/sumber data kesehatan terpercaya.',
 		]);
 
+		$sourceName = $validated['retraining_file']->getClientOriginalName();
+
 		try {
 			$rows = $this->rowsFromSpreadsheet($validated['retraining_file']);
-			$validation = $this->validateRows($rows);
+			$validation = $this->validateRows($rows, requireBothStrokeClasses: false);
 		} catch (Throwable $exception) {
-			return back()
-				->withErrors(['retraining_file' => $exception->getMessage()])
-				->withInput();
-		}
+			$dataset = $this->storeDatasetRecord([
+				'source_type' => 'upload',
+				'source_name' => $sourceName,
+				'status' => RetrainingDataset::STATUS_INVALID,
+				'summary' => ['total_rows' => 0, 'valid_rows' => 0, 'stroke_0' => 0, 'stroke_1' => 0],
+				'preview' => [],
+				'errors' => [$this->rowError('-', '-', $exception->getMessage())],
+			]);
 
-		if (! $validation['is_valid']) {
 			session([
-				'retraining_status' => 'Validasi gagal',
-				'retraining_dataset' => [
-					'uploaded_name' => $validated['retraining_file']->getClientOriginalName(),
-					'is_valid' => false,
-					'preview' => array_slice($rows, 0, 5),
-					'summary' => $validation['summary'],
-					'errors' => $validation['errors'],
-				],
+				'retraining_dataset' => $this->datasetSessionPayload($dataset),
 				'retraining_result' => null,
 			]);
 
-			return redirect()->route('retraining');
+			return redirect()->route('retraining')
+				->withErrors(['retraining_file' => $exception->getMessage()]);
 		}
 
-		$storedPath = $this->storeCleanDataset($validation['clean_rows']);
+		$dataset = $this->persistValidationResult(
+			sourceType: 'upload',
+			sourceName: $sourceName,
+			validation: $validation,
+			previewRows: $validation['is_valid'] ? $validation['clean_rows'] : $rows,
+		);
 
 		session([
-			'retraining_status' => 'Siap retraining',
-			'retraining_dataset' => [
-				'uploaded_name' => $validated['retraining_file']->getClientOriginalName(),
-				'stored_path' => $storedPath,
-				'absolute_path' => Storage::path($storedPath),
-				'is_valid' => true,
-				'preview' => array_slice($validation['clean_rows'], 0, 5),
-				'summary' => $validation['summary'],
-				'errors' => [],
-			],
+			'retraining_dataset' => $this->datasetSessionPayload($dataset),
 			'retraining_result' => null,
 		]);
 
-		return redirect()->route('retraining')->with('success', 'Dataset valid dan siap untuk retraining.');
+		if (! $validation['is_valid']) {
+			return redirect()->route('retraining')
+				->withErrors(['dataset' => 'Dataset gagal validasi dan tidak masuk pool retraining.']);
+		}
+
+		return redirect()->route('retraining')->with('success', 'Dataset valid dan sudah masuk pool data retraining.');
 	}
 
 	public function manual(Request $request)
@@ -121,65 +131,81 @@ class RetrainingController extends Controller
 		}
 
 		$validation = $this->validateRows([$row], requireBothStrokeClasses: false);
-		if (! $validation['is_valid']) {
-			session([
-				'retraining_status' => 'Validasi gagal',
-				'retraining_dataset' => [
-					'uploaded_name' => 'Input manual retraining',
-					'is_valid' => false,
-					'preview' => [$row],
-					'summary' => $validation['summary'],
-					'errors' => $validation['errors'],
-				],
-				'retraining_result' => null,
-			]);
-
-			return redirect()->route('retraining');
-		}
-
-		$storedPath = $this->storeCleanDataset($validation['clean_rows']);
+		$dataset = $this->persistValidationResult(
+			sourceType: 'manual',
+			sourceName: 'Input manual retraining',
+			validation: $validation,
+			previewRows: [$row],
+		);
 
 		session([
-			'retraining_status' => 'Siap retraining',
-			'retraining_dataset' => [
-				'uploaded_name' => 'Input manual retraining',
-				'stored_path' => $storedPath,
-				'absolute_path' => Storage::path($storedPath),
-				'is_valid' => true,
-				'preview' => $validation['clean_rows'],
-				'summary' => $validation['summary'],
-				'errors' => [],
-			],
+			'retraining_dataset' => $this->datasetSessionPayload($dataset),
 			'retraining_result' => null,
 		]);
 
-		return redirect()->route('retraining')->with('success', 'Data manual valid dan siap untuk retraining.');
+		if (! $validation['is_valid']) {
+			return redirect()->route('retraining')
+				->withErrors(['dataset' => 'Input manual gagal validasi dan tidak masuk pool retraining.']);
+		}
+
+		return redirect()->route('retraining')->with('success', 'Data manual valid dan sudah masuk pool data retraining.');
+	}
+
+	public function archive(RetrainingDataset $dataset)
+	{
+		$dataset->update([
+			'status' => RetrainingDataset::STATUS_ARCHIVED,
+			'archived_at' => now(),
+		]);
+
+		session()->forget('retraining_result');
+
+		return redirect()->route('retraining')->with('success', 'Dataset dipindahkan ke arsip.');
 	}
 
 	public function start(Request $request)
 	{
-		$validated = $request->validate([
-			'models' => 'required|array|min:1',
-			'models.*' => 'in:decision_tree,knn',
-		]);
+		$models = $this->modelOptions();
+		$pool = $this->poolSummary($models);
 
-		$dataset = session('retraining_dataset');
-		if (! is_array($dataset) || ! ($dataset['is_valid'] ?? false) || empty($dataset['absolute_path'])) {
+		if (! $pool['data_ready']) {
 			return redirect()->route('retraining')
-				->withErrors(['dataset' => 'Upload dataset valid terlebih dahulu sebelum retraining.']);
+				->withErrors(['pool' => 'Data retraining belum mencukupi. ' . implode(' ', $pool['missing_messages'])]);
 		}
 
-		if (! is_file($dataset['absolute_path'])) {
+		if (! $pool['models_ready']) {
 			return redirect()->route('retraining')
-				->withErrors(['dataset' => 'File dataset valid tidak ditemukan. Silakan upload ulang.']);
+				->withErrors(['models' => 'Retraining penuh belum bisa dijalankan. Model belum tersedia: ' . implode(', ', $pool['missing_models']) . '.']);
 		}
 
-		session(['retraining_status' => 'Sedang training']);
+		if ($pool['training_in_progress']) {
+			return redirect()->route('retraining')
+				->withErrors(['retraining' => 'Masih ada proses retraining yang sedang berjalan. Tunggu sampai selesai.']);
+		}
+
+		$validDatasets = RetrainingDataset::where('status', RetrainingDataset::STATUS_VALID)
+			->whereNotNull('stored_path')
+			->oldest()
+			->get();
+
+		if ($validDatasets->isEmpty()) {
+			return redirect()->route('retraining')
+				->withErrors(['pool' => 'Belum ada dataset valid di pool retraining.']);
+		}
+
+		$combinedPath = $this->combinePoolDatasets($validDatasets);
+		$modelKeys = array_keys(array_filter($models, fn ($model) => $model['available']));
+
+		session(['retraining_result' => null]);
+		if (! Cache::add('retraining_in_progress', true, now()->addMinutes(30))) {
+			return redirect()->route('retraining')
+				->withErrors(['retraining' => 'Masih ada proses retraining yang sedang berjalan. Tunggu sampai selesai.']);
+		}
 
 		try {
 			$response = Http::timeout(240)->post('http://127.0.0.1:5001/retrain', [
-				'dataset_path' => $dataset['absolute_path'],
-				'models' => $validated['models'],
+				'dataset_path' => Storage::path($combinedPath),
+				'models' => $modelKeys,
 				'uploaded_by' => $request->user()->name,
 			]);
 
@@ -193,23 +219,83 @@ class RetrainingController extends Controller
 			}
 		} catch (Throwable $exception) {
 			session([
-				'retraining_status' => 'Gagal',
 				'retraining_result' => [
 					'status' => 'error',
 					'message' => $exception->getMessage(),
 				],
 			]);
+			Cache::forget('retraining_in_progress');
 
 			return redirect()->route('retraining')
 				->withErrors(['retraining' => $exception->getMessage()]);
 		}
 
-		session([
-			'retraining_status' => 'Selesai',
-			'retraining_result' => $result,
+		RetrainingDataset::whereIn('id', $validDatasets->pluck('id'))->update([
+			'status' => RetrainingDataset::STATUS_USED,
+			'used_at' => now(),
+			'updated_at' => now(),
 		]);
 
-		return redirect()->route('retraining')->with('success', 'Retraining selesai. Model lama sudah dibackup sebelum model baru disimpan.');
+		session([
+			'retraining_result' => $result,
+			'retraining_dataset' => null,
+		]);
+		Cache::forget('retraining_in_progress');
+
+		return redirect()->route('retraining')->with('success', 'Retraining selesai. Data pool yang dipakai sudah ditandai Used for Retraining.');
+	}
+
+	private function persistValidationResult(string $sourceType, string $sourceName, array $validation, array $previewRows): RetrainingDataset
+	{
+		$storedPath = $validation['is_valid']
+			? $this->storeCleanDataset($validation['clean_rows'])
+			: null;
+
+		return $this->storeDatasetRecord([
+			'source_type' => $sourceType,
+			'source_name' => $sourceName,
+			'stored_path' => $storedPath,
+			'status' => $validation['is_valid'] ? RetrainingDataset::STATUS_VALID : RetrainingDataset::STATUS_INVALID,
+			'summary' => $validation['summary'],
+			'preview' => array_slice($previewRows, 0, 5),
+			'errors' => $validation['errors'],
+		]);
+	}
+
+	private function storeDatasetRecord(array $payload): RetrainingDataset
+	{
+		$summary = $payload['summary'] ?? [];
+
+		return RetrainingDataset::create([
+			'user_id' => auth()->id(),
+			'source_type' => $payload['source_type'],
+			'source_name' => $payload['source_name'],
+			'stored_path' => $payload['stored_path'] ?? null,
+			'status' => $payload['status'],
+			'total_rows' => (int) ($summary['total_rows'] ?? 0),
+			'valid_rows' => (int) ($summary['valid_rows'] ?? 0),
+			'stroke_0' => (int) ($summary['stroke_0'] ?? 0),
+			'stroke_1' => (int) ($summary['stroke_1'] ?? 0),
+			'preview' => $payload['preview'] ?? [],
+			'errors' => $payload['errors'] ?? [],
+		]);
+	}
+
+	private function datasetSessionPayload(RetrainingDataset $dataset): array
+	{
+		return [
+			'uploaded_name' => $dataset->source_name,
+			'is_valid' => $dataset->status === RetrainingDataset::STATUS_VALID,
+			'preview' => $dataset->preview ?? [],
+			'summary' => [
+				'total_rows' => $dataset->total_rows,
+				'valid_rows' => $dataset->valid_rows,
+				'stroke_0' => $dataset->stroke_0,
+				'stroke_1' => $dataset->stroke_1,
+			],
+			'errors' => $dataset->errors ?? [],
+			'status' => $dataset->status,
+		];
 	}
 
 	private function rowsFromSpreadsheet($file): array
@@ -387,24 +473,149 @@ class RetrainingController extends Controller
 		return $relativePath;
 	}
 
+	private function combinePoolDatasets($datasets): string
+	{
+		$relativePath = 'retraining/combined/retraining_pool_' . now()->format('Ymd_His') . '_' . Str::random(8) . '.csv';
+		$handle = fopen('php://temp', 'r+');
+		fputcsv($handle, self::REQUIRED_COLUMNS);
+
+		foreach ($datasets as $dataset) {
+			if (! $dataset->stored_path || ! Storage::exists($dataset->stored_path)) {
+				continue;
+			}
+
+			$file = fopen(Storage::path($dataset->stored_path), 'r');
+			if ($file === false) {
+				continue;
+			}
+
+			$headerSkipped = false;
+			while (($row = fgetcsv($file)) !== false) {
+				if (! $headerSkipped) {
+					$headerSkipped = true;
+					continue;
+				}
+				fputcsv($handle, $row);
+			}
+			fclose($file);
+		}
+
+		rewind($handle);
+		$csv = stream_get_contents($handle);
+		fclose($handle);
+
+		Storage::put($relativePath, $csv);
+
+		return $relativePath;
+	}
+
+	private function poolSummary(array $models): array
+	{
+		$validDatasets = RetrainingDataset::where('status', RetrainingDataset::STATUS_VALID);
+		$totalRows = (int) (clone $validDatasets)->sum('valid_rows');
+		$stroke0 = (int) (clone $validDatasets)->sum('stroke_0');
+		$stroke1 = (int) (clone $validDatasets)->sum('stroke_1');
+
+		$missingMessages = [];
+		if ($totalRows < self::MIN_TOTAL_ROWS) {
+			$missingMessages[] = 'Tambahkan ' . (self::MIN_TOTAL_ROWS - $totalRows) . ' data valid lagi.';
+		}
+		if ($stroke0 < self::MIN_CLASS_ROWS) {
+			$missingMessages[] = 'Tambahkan ' . (self::MIN_CLASS_ROWS - $stroke0) . ' data pasien tidak stroke lagi.';
+		}
+		if ($stroke1 < self::MIN_CLASS_ROWS) {
+			$missingMessages[] = 'Tambahkan ' . (self::MIN_CLASS_ROWS - $stroke1) . ' data pasien stroke lagi.';
+		}
+
+		$missingModels = array_values(array_map(
+			fn ($model) => $model['name'],
+			array_filter($models, fn ($model) => ! $model['available'])
+		));
+
+		$dataReady = $totalRows >= self::MIN_TOTAL_ROWS
+			&& $stroke0 >= self::MIN_CLASS_ROWS
+			&& $stroke1 >= self::MIN_CLASS_ROWS;
+		$modelsReady = $missingModels === [];
+		$trainingInProgress = (bool) Cache::get('retraining_in_progress', false);
+		if ($trainingInProgress) {
+			$missingMessages[] = 'Masih ada proses retraining yang sedang berjalan.';
+		}
+		$canRetrain = $dataReady && $modelsReady && ! $trainingInProgress;
+
+		$statusLabel = 'Belum siap retraining';
+		if ($canRetrain) {
+			$statusLabel = 'Siap retraining';
+		} elseif ($trainingInProgress) {
+			$statusLabel = 'Sedang training';
+		} elseif ($dataReady && ! $modelsReady) {
+			$statusLabel = 'Data siap, menunggu model';
+		}
+
+		return [
+			'total_rows' => $totalRows,
+			'stroke_0' => $stroke0,
+			'stroke_1' => $stroke1,
+			'min_total_rows' => self::MIN_TOTAL_ROWS,
+			'min_class_rows' => self::MIN_CLASS_ROWS,
+			'progress' => min(100, (int) round(($totalRows / self::MIN_TOTAL_ROWS) * 100)),
+			'missing_messages' => $missingMessages,
+			'missing_models' => $missingModels,
+			'data_ready' => $dataReady,
+			'models_ready' => $modelsReady,
+			'training_in_progress' => $trainingInProgress,
+			'can_retrain' => $canRetrain,
+			'status_label' => $statusLabel,
+		];
+	}
+
 	private function modelOptions(): array
 	{
 		return [
 			'decision_tree' => [
 				'name' => 'Decision Tree',
 				'icon' => 'fa-tree',
-				'available' => true,
+				'available' => $this->modelArtifactAvailable('decision_tree'),
 			],
 			'knn' => [
 				'name' => 'KNN',
 				'icon' => 'fa-diagram-project',
-				'available' => true,
+				'available' => $this->modelArtifactAvailable('knn'),
 			],
 			'svm' => [
 				'name' => 'SVM',
 				'icon' => 'fa-vector-square',
-				'available' => false,
+				'available' => $this->modelArtifactAvailable('svm'),
 			],
 		];
+	}
+
+	private function modelArtifactAvailable(string $modelKey): bool
+	{
+		$basePath = base_path('../ml-api/');
+		$artifacts = [
+			'decision_tree' => [
+				['model' => 'DT_model.pkl', 'features' => 'DT_feature_columns.json'],
+				['model' => 'model.pkl', 'features' => 'feature_columns.json'],
+				['model' => 'active_models/decision_tree_model.pkl', 'features' => 'active_models/decision_tree_feature_columns.json'],
+			],
+			'knn' => [
+				['model' => 'knn_model.pkl', 'features' => 'knn_feature_columns.json'],
+				['model' => 'KNN_model.pkl', 'features' => 'KNN_feature_columns.json'],
+				['model' => 'active_models/knn_model.pkl', 'features' => 'active_models/knn_feature_columns.json'],
+			],
+			'svm' => [
+				['model' => 'svm_model.pkl', 'features' => 'svm_feature_columns.json'],
+				['model' => 'SVM_model.pkl', 'features' => 'SVM_feature_columns.json'],
+				['model' => 'active_models/svm_model.pkl', 'features' => 'active_models/svm_feature_columns.json'],
+			],
+		];
+
+		foreach ($artifacts[$modelKey] ?? [] as $artifact) {
+			if (is_file($basePath . $artifact['model']) && is_file($basePath . $artifact['features'])) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

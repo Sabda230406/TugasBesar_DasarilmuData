@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/retraining', [RetrainingController::class, 'index'])->name('retraining');
     Route::post('/retraining/upload', [RetrainingController::class, 'upload'])->name('retraining.upload');
     Route::post('/retraining/manual', [RetrainingController::class, 'manual'])->name('retraining.manual');
+    Route::post('/retraining/datasets/{dataset}/archive', [RetrainingController::class, 'archive'])->name('retraining.archive');
     Route::post('/retraining/start', [RetrainingController::class, 'start'])->name('retraining.start');
     Route::get('/history', [PredictionController::class, 'history'])->name('history');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

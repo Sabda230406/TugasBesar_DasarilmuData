@@ -400,6 +400,73 @@
             font-weight: 800;
         }
 
+        .retraining-info {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            border: 1px solid rgba(185, 28, 28, 0.14);
+            background:
+                radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 34%),
+                linear-gradient(135deg, #fff7ed, #ffffff 62%);
+            padding: 1.5rem;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+        }
+
+        .retraining-info-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #991b1b;
+            color: #ffffff;
+            font-size: 1.25rem;
+            box-shadow: 0 16px 30px rgba(153, 27, 27, 0.22);
+        }
+
+        .retraining-mini-list {
+            display: grid;
+            gap: 0.7rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .retraining-mini-list li {
+            display: flex;
+            gap: 0.7rem;
+            color: #475569;
+            line-height: 1.55;
+        }
+
+        .retraining-mini-list i {
+            color: #991b1b;
+            margin-top: 0.25rem;
+            flex: 0 0 auto;
+        }
+
+        .retraining-step {
+            border-radius: 18px;
+            border: 1px solid rgba(185, 28, 28, 0.12);
+            background: rgba(255, 255, 255, 0.78);
+            padding: 1rem;
+            height: 100%;
+        }
+
+        .retraining-step-number {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(185, 28, 28, 0.1);
+            color: #991b1b;
+            font-weight: 900;
+            margin-bottom: 0.75rem;
+        }
+
         .soft-copy {
             color: #64748b;
             line-height: 1.7;
@@ -627,6 +694,73 @@
                 </div>
                 <div class="col-lg-4 text-lg-end">
                     <a href="{{ route('form') }}" class="btn btn-dark btn-lg w-100">Mulai Prediksi</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="retraining-info">
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-5">
+                    <div class="d-flex align-items-start gap-3 mb-3">
+                        <span class="retraining-info-icon">
+                            <i class="fa-solid fa-rotate"></i>
+                        </span>
+                        <div>
+                            <p class="section-kicker mb-1">Fitur Retraining</p>
+                            <h2 class="fw-bold mb-2">Model bisa diperbarui dari data diagnosis baru.</h2>
+                        </div>
+                    </div>
+                    <p class="soft-copy mb-3">
+                        Retraining adalah proses melatih ulang model machine learning menggunakan data baru yang sudah punya label asli.
+                        Tujuannya agar model tetap relevan ketika ada tambahan data kesehatan yang valid.
+                    </p>
+                    <ul class="retraining-mini-list mb-3">
+                        <li>
+                            <i class="fa-solid fa-shield-heart"></i>
+                            <span>Data retraining harus berasal dari diagnosis, rekam medis, rumah sakit, dokter, atau dataset kesehatan terpercaya.</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <span>Hasil prediksi website tidak boleh dipakai sebagai label training.</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock"></i>
+                            <span>Retraining baru aktif jika jumlah data valid cukup dan semua model utama sudah tersedia.</span>
+                        </li>
+                    </ul>
+                    <a href="{{ route('retraining') }}" class="btn btn-dark px-4">
+                        <i class="fa-solid fa-database me-2"></i>Buka Menu Retraining
+                    </a>
+                </div>
+                <div class="col-lg-7">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="retraining-step">
+                                <span class="retraining-step-number">1</span>
+                                <h3 class="h6 fw-bold">Kumpulkan Data</h3>
+                                <p class="soft-copy small mb-0">User upload file atau isi manual data pasien dengan label stroke asli.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="retraining-step">
+                                <span class="retraining-step-number">2</span>
+                                <h3 class="h6 fw-bold">Validasi Sistem</h3>
+                                <p class="soft-copy small mb-0">Sistem mengecek kolom, range nilai, kategori, dan kelengkapan data.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="retraining-step">
+                                <span class="retraining-step-number">3</span>
+                                <h3 class="h6 fw-bold">Latih Ulang Model</h3>
+                                <p class="soft-copy small mb-0">Jika syarat lengkap, model dilatih ulang dari dataset awal + pool data valid.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dt-simple-note small mt-3">
+                        <strong>Catatan:</strong> Untuk saat ini retraining berfungsi sebagai pengumpulan dan validasi data terlebih dahulu.
+                        Retraining penuh menunggu semua model utama siap agar Decision Tree, KNN, dan SVM dilatih dari basis data yang sama.
+                    </div>
                 </div>
             </div>
         </section>
