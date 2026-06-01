@@ -707,30 +707,36 @@
                         </span>
                         <div>
                             <p class="section-kicker mb-1">Fitur Retraining</p>
-                            <h2 class="fw-bold mb-2">Model bisa diperbarui dari data diagnosis baru.</h2>
+                            <h2 class="fw-bold mb-2">Model bisa diperbarui dari history prediksi web.</h2>
                         </div>
                     </div>
                     <p class="soft-copy mb-3">
-                        Retraining adalah proses melatih ulang model machine learning menggunakan data baru yang sudah punya label asli.
-                        Tujuannya agar model tetap relevan ketika ada tambahan data kesehatan yang valid.
+                        Retraining adalah proses melatih ulang model machine learning menggunakan history prediksi user.
+                        Input user disimpan bersama hasil prediksi, lalu hasil prediksi tersebut dipakai sebagai label <code>stroke</code>.
                     </p>
                     <ul class="retraining-mini-list mb-3">
                         <li>
                             <i class="fa-solid fa-shield-heart"></i>
-                            <span>Data retraining harus berasal dari diagnosis, rekam medis, rumah sakit, dokter, atau dataset kesehatan terpercaya.</span>
+                            <span>Data retraining diambil dari history prediksi yang tersimpan saat user memakai form atau upload prediksi.</span>
                         </li>
                         <li>
                             <i class="fa-solid fa-circle-exclamation"></i>
-                            <span>Hasil prediksi website tidak boleh dipakai sebagai label training.</span>
+                            <span>Label <code>stroke</code> pada dataset retraining diisi dari hasil prediksi sistem sesuai ketentuan fitur.</span>
                         </li>
                         <li>
                             <i class="fa-solid fa-lock"></i>
                             <span>Retraining baru aktif jika jumlah data valid cukup dan semua model utama sudah tersedia.</span>
                         </li>
                     </ul>
-                    <a href="{{ route('retraining') }}" class="btn btn-dark px-4">
-                        <i class="fa-solid fa-database me-2"></i>Buka Menu Retraining
-                    </a>
+                    @if(auth()->check() && auth()->user()->isAdmin())
+                        <a href="{{ route('admin.retraining') }}" class="btn btn-dark px-4">
+                            <i class="fa-solid fa-database me-2"></i>Buka Panel Retraining
+                        </a>
+                    @else
+                        <span class="status-badge">
+                            <i class="fa-solid fa-lock me-1"></i>Retraining hanya untuk admin
+                        </span>
+                    @endif
                 </div>
                 <div class="col-lg-7">
                     <div class="row g-3">
@@ -738,21 +744,21 @@
                             <div class="retraining-step">
                                 <span class="retraining-step-number">1</span>
                                 <h3 class="h6 fw-bold">Kumpulkan Data</h3>
-                                <p class="soft-copy small mb-0">User upload file atau isi manual data pasien dengan label stroke asli.</p>
+                                <p class="soft-copy small mb-0">Input user dan hasil prediksi tersimpan ke history.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="retraining-step">
                                 <span class="retraining-step-number">2</span>
                                 <h3 class="h6 fw-bold">Validasi Sistem</h3>
-                                <p class="soft-copy small mb-0">Sistem mengecek kolom, range nilai, kategori, dan kelengkapan data.</p>
+                                <p class="soft-copy small mb-0">Admin mengambil history valid menjadi pool dataset retraining.</p>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="retraining-step">
                                 <span class="retraining-step-number">3</span>
                                 <h3 class="h6 fw-bold">Latih Ulang Model</h3>
-                                <p class="soft-copy small mb-0">Jika syarat lengkap, model dilatih ulang dari dataset awal + pool data valid.</p>
+                                <p class="soft-copy small mb-0">Jika syarat lengkap, model dilatih ulang dari dataset awal + history valid.</p>
                             </div>
                         </div>
                     </div>

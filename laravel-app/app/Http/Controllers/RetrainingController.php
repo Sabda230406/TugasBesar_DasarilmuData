@@ -15,6 +15,9 @@ class RetrainingController extends Controller
 {
 	private const MIN_TOTAL_ROWS = 50;
 	private const MIN_CLASS_ROWS = 10;
+	private const RETRAINING_LOCK_KEY = 'retraining_in_progress';
+	private const RETRAINING_LOCK_STARTED_AT_KEY = 'retraining_started_at';
+	private const RETRAINING_LOCK_TTL_MINUTES = 15;
 
 	private const REQUIRED_COLUMNS = [
 		'gender',
@@ -165,6 +168,10 @@ class RetrainingController extends Controller
 
 	public function start(Request $request)
 	{
+		@set_time_limit(300);
+
+		$this->releaseStaleRetrainingLock();
+
 		$models = $this->modelOptions();
 		$pool = $this->poolSummary($models);
 
@@ -197,10 +204,11 @@ class RetrainingController extends Controller
 		$modelKeys = array_keys(array_filter($models, fn ($model) => $model['available']));
 
 		session(['retraining_result' => null]);
-		if (! Cache::add('retraining_in_progress', true, now()->addMinutes(30))) {
+		if (! Cache::add(self::RETRAINING_LOCK_KEY, true, now()->addMinutes(self::RETRAINING_LOCK_TTL_MINUTES))) {
 			return redirect()->route('retraining')
 				->withErrors(['retraining' => 'Masih ada proses retraining yang sedang berjalan. Tunggu sampai selesai.']);
 		}
+		Cache::put(self::RETRAINING_LOCK_STARTED_AT_KEY, now()->toDateTimeString(), now()->addMinutes(self::RETRAINING_LOCK_TTL_MINUTES));
 
 		try {
 			$response = Http::timeout(240)->post('http://127.0.0.1:5001/retrain', [
@@ -224,17 +232,17 @@ class RetrainingController extends Controller
 					'message' => $exception->getMessage(),
 				],
 			]);
-			Cache::forget('retraining_in_progress');
 
 			return redirect()->route('retraining')
 				->withErrors(['retraining' => $exception->getMessage()]);
+		} finally {
+			$this->clearRetrainingLock();
 		}
 
 		session([
 			'retraining_result' => $result,
 			'retraining_dataset' => null,
 		]);
-		Cache::forget('retraining_in_progress');
 
 		if ((bool) ($result['activated'] ?? true)) {
 			RetrainingDataset::whereIn('id', $validDatasets->pluck('id'))->update([
@@ -515,6 +523,8 @@ class RetrainingController extends Controller
 
 	private function poolSummary(array $models): array
 	{
+		$this->releaseStaleRetrainingLock();
+
 		$validDatasets = RetrainingDataset::where('status', RetrainingDataset::STATUS_VALID);
 		$totalRows = (int) (clone $validDatasets)->sum('valid_rows');
 		$stroke0 = (int) (clone $validDatasets)->sum('stroke_0');
@@ -540,7 +550,7 @@ class RetrainingController extends Controller
 			&& $stroke0 >= self::MIN_CLASS_ROWS
 			&& $stroke1 >= self::MIN_CLASS_ROWS;
 		$modelsReady = $missingModels === [];
-		$trainingInProgress = (bool) Cache::get('retraining_in_progress', false);
+		$trainingInProgress = (bool) Cache::get(self::RETRAINING_LOCK_KEY, false);
 		if ($trainingInProgress) {
 			$missingMessages[] = 'Masih ada proses retraining yang sedang berjalan.';
 		}
@@ -570,6 +580,31 @@ class RetrainingController extends Controller
 			'can_retrain' => $canRetrain,
 			'status_label' => $statusLabel,
 		];
+	}
+
+	private function releaseStaleRetrainingLock(): void
+	{
+		if (! Cache::get(self::RETRAINING_LOCK_KEY, false)) {
+			return;
+		}
+
+		$startedAt = Cache::get(self::RETRAINING_LOCK_STARTED_AT_KEY);
+		if (! $startedAt || $this->isLockExpired((string) $startedAt)) {
+			$this->clearRetrainingLock();
+		}
+	}
+
+	private function isLockExpired(string $startedAt): bool
+	{
+		$timestamp = strtotime($startedAt);
+
+		return ! $timestamp || (time() - $timestamp) >= (self::RETRAINING_LOCK_TTL_MINUTES * 60);
+	}
+
+	private function clearRetrainingLock(): void
+	{
+		Cache::forget(self::RETRAINING_LOCK_KEY);
+		Cache::forget(self::RETRAINING_LOCK_STARTED_AT_KEY);
 	}
 
 	private function modelOptions(): array

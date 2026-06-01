@@ -151,6 +151,27 @@
             font-size: 0.88rem;
         }
 
+        .user-dropdown .dropdown-toggle {
+            border: 1px solid var(--line);
+            background: #f8fafc;
+            color: var(--text-main);
+            font-weight: 700;
+            padding: 0.45rem 0.85rem;
+        }
+
+        .user-dropdown .dropdown-menu {
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-sm);
+            padding: 0.5rem;
+            min-width: 220px;
+        }
+
+        .user-dropdown .dropdown-item {
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
         @media (max-width: 991.98px) {
             .navbar-collapse {
                 padding: 1rem 0 0.4rem;
@@ -206,11 +227,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('retraining') || request()->routeIs('retraining.*') ? 'active' : '' }}" href="{{ route('retraining') }}">
-                            <i class="fa-solid fa-rotate me-1"></i> Retraining
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('history') ? 'active' : '' }}" href="{{ route('history') }}">
                             <i class="fa-solid fa-clock-rotate-left me-1"></i> Riwayat
                         </a>
@@ -219,14 +235,30 @@
 
                 <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mt-lg-0">
                     @auth
-                        <span class="user-pill">
-                            <i class="fa-solid fa-user"></i>
-                            {{ auth()->user()->name }}
-                        </span>
-                        <form action="{{ route('logout') }}" method="POST" class="m-0">
-                            @csrf
-                            <button class="btn btn-outline-dark nav-auth-btn" type="submit">Logout</button>
-                        </form>
+                        <div class="dropdown user-dropdown">
+                            <button class="btn dropdown-toggle user-pill" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fa-solid fa-user"></i>
+                                {{ auth()->user()->name }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                @if(auth()->user()->isAdmin())
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('admin.dashboard') }}">
+                                            <i class="fa-solid fa-shield-halved me-2"></i>Panel Admin
+                                        </a>
+                                    </li>
+                                @endif
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form action="{{ route('logout') }}" method="POST" class="m-0">
+                                        @csrf
+                                        <button class="dropdown-item text-danger" type="submit">
+                                            <i class="fa-solid fa-right-from-bracket me-2"></i>Logout
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
                     @else
                         <a href="{{ route('login') }}" class="btn btn-outline-dark nav-auth-btn">Login</a>
                         <a href="{{ route('register') }}" class="btn btn-dark nav-auth-btn">Register</a>
