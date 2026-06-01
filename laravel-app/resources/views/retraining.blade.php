@@ -1043,6 +1043,10 @@
 		<div class="alert alert-success">{{ session('success') }}</div>
 	@endif
 
+	@if(session('warning'))
+		<div class="alert alert-warning">{{ session('warning') }}</div>
+	@endif
+
 	@if($errors->any())
 		<div class="alert alert-danger">
 			<ul class="mb-0">
@@ -1496,18 +1500,29 @@
 			@if(($result['status'] ?? null) === 'error')
 				<div class="alert alert-danger mb-0">{{ $result['message'] ?? 'Retraining gagal.' }}</div>
 			@else
-				<p class="text-muted">Backup model lama: <code>{{ $result['backup_dir'] ?? '-' }}</code></p>
+				<div class="alert {{ ($result['activated'] ?? true) ? 'alert-success' : 'alert-warning' }}">
+					<i class="fa-solid {{ ($result['activated'] ?? true) ? 'fa-circle-check' : 'fa-triangle-exclamation' }} me-1"></i>
+					{{ $result['message'] ?? 'Retraining selesai.' }}
+				</div>
+				@if(!empty($result['backup_dir']))
+					<p class="text-muted">Backup model lama: <code>{{ $result['backup_dir'] }}</code></p>
+				@endif
 				@foreach(($result['models'] ?? []) as $modelKey => $modelResult)
 					@php
 						$metrics = $modelResult['metrics'] ?? [];
 						$strokeMetrics = $metrics['classification_report']['1'] ?? [];
 						$cm = $metrics['confusion_matrix'] ?? [[0, 0], [0, 0]];
 						$falseNegative = $cm[1][0] ?? 0;
+						$eligibility = $modelResult['eligibility'] ?? ['accepted' => true, 'reasons' => []];
+						$isAccepted = (bool) ($eligibility['accepted'] ?? true);
 					@endphp
 					<div class="border rounded-4 p-3 mb-3">
 						<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
 							<h3 class="h6 fw-bold mb-0">{{ $modelResult['model_name'] ?? $modelKey }}</h3>
-							<span class="status-pill success"><i class="fa-solid fa-circle-check"></i>Berhasil</span>
+							<span class="status-pill {{ $isAccepted ? 'success' : 'warning' }}">
+								<i class="fa-solid {{ $isAccepted ? 'fa-circle-check' : 'fa-triangle-exclamation' }}"></i>
+								{{ $isAccepted ? 'Layak Diaktifkan' : 'Belum Diaktifkan' }}
+							</span>
 						</div>
 						<div class="metric-grid">
 							<div class="metric-box">
@@ -1527,6 +1542,12 @@
 								<div class="metric-value text-danger">{{ $falseNegative }}</div>
 							</div>
 						</div>
+						@if(! $isAccepted && ! empty($eligibility['reasons']))
+							<div class="alert alert-warning mt-3 mb-0">
+								<strong>Alasan belum diaktifkan:</strong>
+								{{ implode(' ', $eligibility['reasons']) }}
+							</div>
+						@endif
 					</div>
 				@endforeach
 			@endif

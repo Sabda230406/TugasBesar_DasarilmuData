@@ -230,19 +230,23 @@ class RetrainingController extends Controller
 				->withErrors(['retraining' => $exception->getMessage()]);
 		}
 
-		RetrainingDataset::whereIn('id', $validDatasets->pluck('id'))->update([
-			'status' => RetrainingDataset::STATUS_USED,
-			'used_at' => now(),
-			'updated_at' => now(),
-		]);
-
 		session([
 			'retraining_result' => $result,
 			'retraining_dataset' => null,
 		]);
 		Cache::forget('retraining_in_progress');
 
-		return redirect()->route('retraining')->with('success', 'Retraining selesai. Data pool yang dipakai sudah ditandai Used for Retraining.');
+		if ((bool) ($result['activated'] ?? true)) {
+			RetrainingDataset::whereIn('id', $validDatasets->pluck('id'))->update([
+				'status' => RetrainingDataset::STATUS_USED,
+				'used_at' => now(),
+				'updated_at' => now(),
+			]);
+
+			return redirect()->route('retraining')->with('success', 'Retraining selesai. Model baru sudah aktif dan data pool ditandai Used for Retraining.');
+		}
+
+		return redirect()->route('retraining')->with('warning', 'Retraining selesai, tetapi model baru belum diaktifkan karena metrik belum layak. Data pool tetap aman.');
 	}
 
 	private function persistValidationResult(string $sourceType, string $sourceName, array $validation, array $previewRows): RetrainingDataset

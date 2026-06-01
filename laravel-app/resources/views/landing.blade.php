@@ -758,8 +758,8 @@
                     </div>
 
                     <div class="dt-simple-note small mt-3">
-                        <strong>Catatan:</strong> Untuk saat ini retraining berfungsi sebagai pengumpulan dan validasi data terlebih dahulu.
-                        Retraining penuh menunggu semua model utama siap agar Decision Tree, KNN, dan SVM dilatih dari basis data yang sama.
+                        <strong>Catatan:</strong> Retraining penuh dijalankan saat data pool sudah memenuhi syarat.
+                        Decision Tree, KNN, dan SVM akan dilatih dari basis data yang sama agar evaluasinya lebih adil.
                     </div>
                 </div>
             </div>

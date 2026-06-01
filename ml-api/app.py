@@ -21,6 +21,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 app = Flask(__name__)
@@ -477,8 +478,8 @@ def selected_retrain_models(model_keys):
 	selected = []
 	for model_key in model_keys:
 		normalized = normalize_model_key(model_key)
-		if normalized not in {"decision_tree", "knn"}:
-			raise ValueError(f"Model {model_key} belum tersedia untuk retraining MVP.")
+		if normalized not in {"decision_tree", "knn", "svm"}:
+			raise ValueError(f"Model {model_key} belum tersedia untuk retraining.")
 		if normalized not in selected:
 			selected.append(normalized)
 
@@ -508,6 +509,25 @@ def model_training_config(model_key):
 				"model__weights": ["uniform", "distance"],
 				"model__metric": ["euclidean", "manhattan"],
 			},
+		}
+
+	if model_key == "svm":
+		return {
+			"name": "SVM",
+			"estimator": SVC(probability=True, random_state=42),
+			"param_grid": [
+				{
+					"model__C": [0.5, 1, 2],
+					"model__kernel": ["linear"],
+					"model__class_weight": [None, "balanced"],
+				},
+				{
+					"model__C": [0.5, 1, 2],
+					"model__kernel": ["rbf"],
+					"model__gamma": ["scale", "auto"],
+					"model__class_weight": [None, "balanced"],
+				},
+			],
 		}
 
 	raise ValueError(f"Trainer {model_key} belum tersedia.")
@@ -588,6 +608,16 @@ def retrain_artifact_paths(model_key):
 			"active_metrics": BASE_DIR / "active_models" / "knn_metrics.json",
 		}
 
+	if model_key == "svm":
+		return {
+			"root_model": BASE_DIR / "svm_model.pkl",
+			"root_features": BASE_DIR / "svm_feature_columns.json",
+			"root_metrics": BASE_DIR / "svm_model_metrics.json",
+			"active_model": BASE_DIR / "active_models" / "svm_model.pkl",
+			"active_features": BASE_DIR / "active_models" / "svm_feature_columns.json",
+			"active_metrics": BASE_DIR / "active_models" / "svm_metrics.json",
+		}
+
 	raise ValueError(f"Artefak {model_key} belum tersedia.")
 
 
@@ -621,6 +651,86 @@ def save_retrained_model(model_key, trained_model, metrics):
 	shutil.copy2(paths["active_features"], paths["root_features"])
 	shutil.copy2(paths["active_metrics"], paths["root_metrics"])
 	runtime_models.pop(model_key, None)
+
+
+def nested_metric(metrics, *keys):
+	value = metrics
+	for key in keys:
+		if not isinstance(value, dict) or key not in value:
+			return None
+		value = value[key]
+	return value
+
+
+def metric_number(value):
+	try:
+		if value is None:
+			return None
+		return float(value)
+	except (TypeError, ValueError):
+		return None
+
+
+def false_negative(metrics):
+	matrix = metrics.get("confusion_matrix") if isinstance(metrics, dict) else None
+	if not isinstance(matrix, list) or len(matrix) < 2:
+		return None
+	try:
+		return int(matrix[1][0])
+	except (TypeError, ValueError, IndexError):
+		return None
+
+
+def active_model_metrics(model_key):
+	artifacts = resolve_artifacts(model_key)
+	if artifacts is None:
+		return {}
+
+	metric_path = artifacts["metrics"] if artifacts["metrics"].exists() else None
+	if metric_path is None:
+		return {}
+
+	return load_model_metrics(metric_path, MODEL_DEFINITIONS[model_key]["display_name"])
+
+
+def evaluate_model_eligibility(model_key, new_metrics):
+	previous_metrics = active_model_metrics(model_key)
+	if not previous_metrics:
+		return {
+			"accepted": True,
+			"reasons": ["Model lama belum memiliki metrik pembanding."],
+			"previous_metrics": {},
+		}
+
+	previous_recall = metric_number(nested_metric(previous_metrics, "classification_report", "1", "recall"))
+	new_recall = metric_number(nested_metric(new_metrics, "classification_report", "1", "recall"))
+	previous_f1 = metric_number(nested_metric(previous_metrics, "classification_report", "1", "f1-score"))
+	new_f1 = metric_number(nested_metric(new_metrics, "classification_report", "1", "f1-score"))
+	previous_accuracy = metric_number(previous_metrics.get("accuracy"))
+	new_accuracy = metric_number(new_metrics.get("accuracy"))
+	previous_fn = false_negative(previous_metrics)
+	new_fn = false_negative(new_metrics)
+
+	reasons = []
+	if previous_recall is not None and new_recall is not None and new_recall < previous_recall - 0.05:
+		reasons.append("Recall stroke turun lebih dari 5%.")
+
+	if previous_f1 is not None and new_f1 is not None and new_f1 < previous_f1 - 0.10:
+		reasons.append("F1-score stroke turun terlalu besar.")
+
+	if previous_accuracy is not None and new_accuracy is not None and new_accuracy < previous_accuracy - 0.10:
+		reasons.append("Accuracy turun terlalu jauh.")
+
+	if previous_fn is not None and new_fn is not None:
+		allowed_fn = max(previous_fn + 2, int(round(previous_fn * 1.25)))
+		if new_fn > allowed_fn:
+			reasons.append("False negative meningkat signifikan.")
+
+	return {
+		"accepted": len(reasons) == 0,
+		"reasons": reasons or ["Metrik model baru masih dalam batas layak."],
+		"previous_metrics": previous_metrics,
+	}
 
 
 def to_jsonable(value):
@@ -713,21 +823,40 @@ def retrain():
 				"metrics": metrics,
 			}
 
-		backup_dir = backup_existing_models(model_keys, timestamp)
+		eligibility_results = {
+			model_key: evaluate_model_eligibility(model_key, result["metrics"])
+			for model_key, result in trained_results.items()
+		}
+		activated = all(result["accepted"] for result in eligibility_results.values())
+		backup_dir = None
+		if activated:
+			backup_dir = backup_existing_models(model_keys, timestamp)
+
 		response_models = {}
 		for model_key, result in trained_results.items():
-			save_retrained_model(model_key, result["model"], result["metrics"])
+			if activated:
+				save_retrained_model(model_key, result["model"], result["metrics"])
+
 			metrics = to_jsonable(result["metrics"])
+			eligibility = to_jsonable(eligibility_results[model_key])
 			response_models[model_key] = {
 				"model_name": metrics["model_name"],
 				"metrics": metrics,
+				"eligibility": {
+					"accepted": eligibility["accepted"],
+					"reasons": eligibility["reasons"],
+				},
+				"previous_metrics": eligibility["previous_metrics"],
 			}
 
 		return jsonify(
 			{
 				"status": "success",
-				"message": "Retraining selesai.",
-				"backup_dir": str(backup_dir),
+				"activated": activated,
+				"message": "Retraining selesai dan model baru diaktifkan."
+				if activated
+				else "Retraining selesai, tetapi model baru belum diaktifkan karena metrik belum layak.",
+				"backup_dir": str(backup_dir) if backup_dir else None,
 				"models": response_models,
 			}
 		)
