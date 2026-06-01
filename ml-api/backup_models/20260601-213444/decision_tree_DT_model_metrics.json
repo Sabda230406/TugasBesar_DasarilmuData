@@ -61,7 +61,7 @@
     "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
     "scoring": "f1",
     "random_state": 42,
-    "retrained_at": "20260601-213444",
+    "retrained_at": "20260601-210139",
     "trained_by": "Sabda Putra Aribawa",
     "uploaded_rows": 137,
     "combined_rows": 5221,

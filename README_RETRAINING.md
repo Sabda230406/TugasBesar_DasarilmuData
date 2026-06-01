@@ -4,14 +4,14 @@ Dokumen ini menjelaskan fitur **Retraining Model** pada project Laravel + Flask 
 
 ## Tujuan
 
-Fitur retraining dipakai untuk melatih ulang model dengan dataset baru yang sudah memiliki label asli `stroke` bernilai `0` atau `1`.
+Fitur retraining dipakai untuk melatih ulang model dari history prediksi user yang tersimpan di web.
 
 Penting:
 
-- Upload prediksi biasa hanya untuk menghasilkan prediksi.
-- Retraining hanya untuk data berlabel asli.
-- Label `stroke` tidak boleh berasal dari hasil prediksi website.
-- Sistem hanya mengecek format dan konsistensi data, bukan memastikan kebenaran medis 100%.
+- Input user disimpan ke tabel history bersama hasil prediksi model.
+- Saat history dipakai untuk retraining, kolom `stroke` diisi dari hasil prediksi sistem.
+- Data history bisa diexport sebagai CSV dengan format dataset retraining.
+- Admin bisa memasukkan history prediksi valid ke pool retraining dari halaman Admin.
 
 ## Model Yang Didukung
 
@@ -19,8 +19,7 @@ Saat ini fitur retraining mendukung:
 
 - Decision Tree
 - KNN
-
-SVM masih ditampilkan sebagai belum tersedia.
+- SVM
 
 ## Cara Akses
 
@@ -30,22 +29,20 @@ Jalankan Laravel:
 php artisan serve
 ```
 
-Buka menu:
+Buka menu Admin:
 
 ```text
-http://127.0.0.1:8000/retraining
+http://127.0.0.1:8000/admin/retraining
 ```
 
-Saat masuk menu Retraining, user wajib membaca pop-up peringatan terlebih dahulu sebelum form bisa digunakan.
+Menu retraining hanya bisa diakses akun dengan role `admin`.
 
 ## Opsi Input Dataset
 
-Halaman Retraining punya 2 cara input data:
+Halaman Admin Retraining punya sumber data utama:
 
-- Upload File: untuk banyak data sekaligus lewat CSV/XLSX.
-- Isi Manual: untuk menambahkan 1 baris data diagnosis secara langsung dari form.
-
-Keduanya tetap wajib menggunakan label asli `stroke`.
+- Ambil dari History: input user + hasil prediksi sistem dimasukkan ke pool retraining.
+- Download CSV History: export history ke format dataset retraining.
 
 ## Kolom Dataset Wajib
 
@@ -65,7 +62,7 @@ smoking_status
 stroke
 ```
 
-Template bisa di-download dari halaman Retraining.
+CSV history yang didownload sudah memakai kolom ini.
 
 ## Aturan Validasi
 
@@ -80,12 +77,12 @@ Sistem akan mengecek:
 - `avg_glucose_level` harus angka dengan range `40-400`.
 - Kategori harus sesuai pilihan sistem.
 - Kolom wajib tidak boleh kosong.
-- Upload file harus memiliki dua kelas, yaitu `stroke=0` dan `stroke=1`.
+- Pool retraining harus memiliki cukup data `stroke=0` dan `stroke=1`.
 
 Catatan:
 
-- Input manual boleh menyimpan satu baris saja, jadi tidak wajib langsung punya dua kelas.
-- File upload tetap wajib punya dua kelas agar dataset tidak timpang dari awal.
+- Nilai `stroke` dari history diambil dari hasil prediksi sistem.
+- Dataset history tetap divalidasi format, range nilai, kategori, dan kelengkapan kolom.
 
 ## Nilai Kategori Valid
 
@@ -99,18 +96,19 @@ smoking_status: formerly smoked, never smoked, smokes, Unknown
 
 ## Alur Retraining
 
-1. User membuka menu Retraining.
-2. User membaca pop-up peringatan.
-3. User memilih Upload File atau Isi Manual.
-4. User mengisi/unggah data berlabel asli `stroke`.
-5. Sistem validasi data.
-6. Jika valid, data disimpan sebagai dataset retraining bersih.
-7. User memilih model yang ingin dilatih ulang.
-8. Laravel mengirim dataset valid ke Flask ML API.
-9. Flask menjalankan proses training.
-10. Model lama dibackup.
-11. Model baru disimpan sebagai model aktif jika proses berhasil.
-12. Metrics retraining ditampilkan di halaman web.
+1. User melakukan prediksi lewat form atau upload file prediksi.
+2. Sistem menyimpan input user dan hasil prediksi ke history.
+3. Admin membuka menu Admin Retraining.
+4. Admin menekan tombol Ambil History ke Pool.
+5. Sistem membentuk dataset retraining dari history prediksi user.
+6. Kolom `stroke` diisi dari hasil prediksi sistem.
+7. Sistem validasi format, kategori, range nilai, dan kelengkapan data.
+8. Jika valid, data masuk pool retraining.
+9. Jika syarat pool terpenuhi, admin menjalankan retraining semua model.
+10. Laravel mengirim dataset valid ke Flask ML API.
+11. Flask menjalankan proses training.
+12. Model lama dibackup.
+13. Model baru disimpan sebagai model aktif jika proses berhasil dan metrik layak.
 
 ## Endpoint Laravel
 
@@ -119,6 +117,9 @@ GET  /retraining
 POST /retraining/upload
 POST /retraining/manual
 POST /retraining/start
+GET  /admin/retraining
+POST /admin/retraining/history/import
+GET  /admin/history/export
 ```
 
 ## Endpoint Flask
@@ -132,7 +133,7 @@ Payload utama:
 ```json
 {
   "dataset_path": "path dataset valid",
-  "models": ["decision_tree", "knn"],
+  "models": ["decision_tree", "knn", "svm"],
   "uploaded_by": "nama user"
 }
 ```

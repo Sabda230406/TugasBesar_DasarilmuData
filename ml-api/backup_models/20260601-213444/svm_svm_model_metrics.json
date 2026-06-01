@@ -1,6 +1,6 @@
 {
-    "model_name": "Decision Tree",
-    "model_key": "decision_tree",
+    "model_name": "SVM",
+    "model_key": "svm",
     "feature_columns": [
         "gender",
         "age",
@@ -13,38 +13,38 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.7197549770290965,
+    "accuracy": 0.7404287901990811,
     "classification_report": {
         "0": {
-            "precision": 0.9853932584269663,
-            "recall": 0.7130081300813008,
-            "f1-score": 0.8273584905660377,
+            "precision": 0.9858233369683751,
+            "recall": 0.734959349593496,
+            "f1-score": 0.8421052631578947,
             "support": 1230.0
         },
         "1": {
-            "precision": 0.15144230769230768,
+            "precision": 0.16195372750642673,
             "recall": 0.8289473684210527,
-            "f1-score": 0.25609756097560976,
+            "f1-score": 0.2709677419354839,
             "support": 76.0
         },
-        "accuracy": 0.7197549770290965,
+        "accuracy": 0.7404287901990811,
         "macro avg": {
-            "precision": 0.568417783059637,
-            "recall": 0.7709777492511767,
-            "f1-score": 0.5417280257708237,
+            "precision": 0.5738885322374009,
+            "recall": 0.7819533590072743,
+            "f1-score": 0.5565365025466893,
             "support": 1306.0
         },
         "weighted avg": {
-            "precision": 0.9368631877869711,
-            "recall": 0.7197549770290965,
-            "f1-score": 0.794115128660316,
+            "precision": 0.9378799293733461,
+            "recall": 0.7404287901990811,
+            "f1-score": 0.8088690827498523,
             "support": 1306.0
         }
     },
     "confusion_matrix": [
         [
-            877,
-            353
+            904,
+            326
         ],
         [
             13,
@@ -52,16 +52,14 @@
         ]
     ],
     "best_params": {
+        "model__C": 1,
         "model__class_weight": null,
-        "model__criterion": "gini",
-        "model__max_depth": 5,
-        "model__min_samples_leaf": 1,
-        "model__min_samples_split": 2
+        "model__kernel": "linear"
     },
     "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
     "scoring": "f1",
     "random_state": 42,
-    "retrained_at": "20260601-213444",
+    "retrained_at": "20260601-210139",
     "trained_by": "Sabda Putra Aribawa",
     "uploaded_rows": 137,
     "combined_rows": 5221,
