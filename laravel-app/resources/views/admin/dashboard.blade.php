@@ -1,118 +1,28 @@
 @extends('layouts.admin')
 
 @section('content')
-	<style>
-		.admin-shell {
-			display: grid;
-			gap: 1.5rem;
-		}
-
-		.admin-hero {
-			border-radius: 22px;
-			border: 1px solid rgba(22, 163, 74, 0.18);
-			background:
-				radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 34%),
-				linear-gradient(135deg, rgba(236, 253, 245, 0.96), rgba(255, 255, 255, 0.98));
-			padding: 1.5rem;
-		}
-
-		.admin-stat {
-			border: 1px solid var(--admin-line);
-			border-radius: 18px;
-			background: #fff;
-			padding: 1.15rem;
-			box-shadow: var(--shadow-sm);
-			height: 100%;
-		}
-
-		.admin-stat span {
-			display: block;
-			color: var(--admin-muted);
-			font-size: 0.78rem;
-			font-weight: 800;
-			text-transform: uppercase;
-			letter-spacing: 0.08em;
-		}
-
-		.admin-stat strong {
-			display: block;
-			color: var(--admin-text);
-			font-size: 1.8rem;
-			font-weight: 800;
-			margin-top: 0.35rem;
-		}
-
-		.admin-card {
-			border: 1px solid var(--admin-line);
-			border-radius: 18px;
-			background: #fff;
-			padding: 1.25rem;
-			box-shadow: var(--shadow-sm);
-			height: 100%;
-		}
-
-		.quick-action {
-			display: flex;
-			align-items: center;
-			gap: 0.85rem;
-			border: 1px solid var(--admin-line);
-			border-radius: 16px;
-			padding: 1rem;
-			text-decoration: none;
-			color: var(--admin-text);
-			background: var(--admin-soft);
-			font-weight: 800;
-			transition: 0.2s ease;
-		}
-
-		.quick-action:hover {
-			transform: translateY(-2px);
-			border-color: rgba(22, 163, 74, 0.32);
-			background: #ecfdf5;
-			color: var(--admin-brand-deep);
-		}
-
-		.quick-action i {
-			width: 42px;
-			height: 42px;
-			border-radius: 14px;
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			background: var(--admin-brand-soft);
-			color: var(--admin-brand-deep);
-		}
-
-		.model-pill {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.4rem;
-			border-radius: 999px;
-			padding: 0.45rem 0.7rem;
-			font-weight: 800;
-			font-size: 0.8rem;
-			background: #eef7f1;
-			color: #475569;
-		}
-
-		.model-pill.ready {
-			background: var(--admin-brand-soft);
-			color: var(--admin-brand-deep);
-		}
-
-		.table td,
-		.table th {
-			vertical-align: middle;
-		}
-	</style>
+	@php
+		$statusTone = function ($status) {
+			return match ($status) {
+				'Valid' => 'success',
+				'Invalid' => 'danger',
+				'Used for Retraining' => 'primary',
+				'Archived' => 'secondary',
+				default => 'light',
+			};
+		};
+	@endphp
 
 	<div class="admin-shell">
 		<section class="admin-hero">
 			<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-				<div>
-					<p class="eyebrow mb-2">Admin Dashboard</p>
-					<h1 class="fw-bold mb-2">Kontrol sistem StrokeRisk.</h1>
-					<p class="section-subtitle mb-0">Kelola user, pantau retraining, dan ambil history prediksi user sebagai dataset retraining.</p>
+				<div class="d-flex gap-3 align-items-start">
+					<span class="admin-page-icon"><i class="fa-solid fa-shield-heart"></i></span>
+					<div>
+						<p class="eyebrow mb-2">Admin Dashboard</p>
+						<h1 class="fw-bold mb-2">Kontrol sistem StrokeRisk</h1>
+						<p class="section-subtitle mb-0">Kelola user, pantau kesiapan retraining, dan ubah history prediksi menjadi dataset model.</p>
+					</div>
 				</div>
 				<a href="{{ route('admin.history.export') }}" class="btn btn-dark">
 					<i class="fa-solid fa-file-csv me-2"></i>Download CSV Retraining
@@ -123,26 +33,46 @@
 		<div class="row g-3">
 			<div class="col-md-6 col-xl-3">
 				<div class="admin-stat">
-					<span>Total User</span>
-					<strong>{{ $stats['users'] }}</strong>
+					<div class="d-flex justify-content-between align-items-start gap-3">
+						<div>
+							<span>Total User</span>
+							<strong>{{ $stats['users'] }}</strong>
+						</div>
+						<i class="fa-solid fa-users stat-icon"></i>
+					</div>
 				</div>
 			</div>
 			<div class="col-md-6 col-xl-3">
 				<div class="admin-stat">
-					<span>Total History</span>
-					<strong>{{ $stats['histories'] }}</strong>
+					<div class="d-flex justify-content-between align-items-start gap-3">
+						<div>
+							<span>Total History</span>
+							<strong>{{ $stats['histories'] }}</strong>
+						</div>
+						<i class="fa-solid fa-clock-rotate-left stat-icon"></i>
+					</div>
 				</div>
 			</div>
 			<div class="col-md-6 col-xl-3">
 				<div class="admin-stat">
-					<span>Data Retraining Valid</span>
-					<strong>{{ $stats['validRetrainingRows'] }}</strong>
+					<div class="d-flex justify-content-between align-items-start gap-3">
+						<div>
+							<span>Data Valid</span>
+							<strong>{{ $stats['validRetrainingRows'] }}</strong>
+						</div>
+						<i class="fa-solid fa-database stat-icon"></i>
+					</div>
 				</div>
 			</div>
 			<div class="col-md-6 col-xl-3">
 				<div class="admin-stat">
-					<span>Model Tersedia</span>
-					<strong>{{ $stats['readyModels'] }}/{{ $stats['totalModels'] }}</strong>
+					<div class="d-flex justify-content-between align-items-start gap-3">
+						<div>
+							<span>Model Tersedia</span>
+							<strong>{{ $stats['readyModels'] }}/{{ $stats['totalModels'] }}</strong>
+						</div>
+						<i class="fa-solid fa-brain stat-icon"></i>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -160,9 +90,13 @@
 							<i class="fa-solid fa-database"></i>
 							<span>Kelola Retraining</span>
 						</a>
+						<a href="{{ route('admin.models') }}" class="quick-action">
+							<i class="fa-solid fa-brain"></i>
+							<span>Paket Retraining Aktif</span>
+						</a>
 						<a href="{{ route('admin.history.export') }}" class="quick-action">
 							<i class="fa-solid fa-download"></i>
-							<span>Download History untuk Retraining</span>
+							<span>Download History Baru</span>
 						</a>
 					</div>
 				</div>
@@ -200,18 +134,24 @@
 						@endforeach
 					</div>
 					<hr>
-					<p class="section-subtitle mb-0">Model aktif tetap disimpan di folder <code>ml-api</code>. Backup otomatis dibuat saat retraining mengganti model aktif.</p>
+					<p class="section-subtitle mb-3">Admin bisa memilih paket hasil retraining yang dipakai sistem, lalu melihat metrik model di dalamnya.</p>
+					<a href="{{ route('admin.models') }}" class="btn btn-outline-dark w-100">
+						<i class="fa-solid fa-chart-simple me-2"></i>Lihat Paket Retraining
+					</a>
 				</div>
 			</div>
 		</div>
 
 		<div class="admin-card">
 			<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-				<div>
-					<h2 class="h5 fw-bold mb-1">History menjadi dataset retraining</h2>
-					<p class="section-subtitle mb-0">
-						Export CSV memakai format retraining langsung. Kolom <code>stroke</code> diisi dari hasil prediksi sistem yang tersimpan di history.
-					</p>
+				<div class="d-flex gap-3 align-items-start">
+					<span class="stat-icon"><i class="fa-solid fa-file-arrow-down"></i></span>
+					<div>
+						<h2 class="h5 fw-bold mb-1">History menjadi dataset retraining</h2>
+						<p class="section-subtitle mb-0">
+							Export CSV memakai format retraining langsung. Kolom <code>stroke</code> diisi dari hasil prediksi sistem yang tersimpan di history.
+						</p>
+					</div>
 				</div>
 				<a href="{{ route('admin.retraining') }}" class="btn btn-outline-dark">
 					<i class="fa-solid fa-database me-2"></i>Kelola Pool History
@@ -222,9 +162,15 @@
 		<div class="row g-4">
 			<div class="col-lg-6">
 				<div class="admin-card">
-					<h2 class="h5 fw-bold mb-3">Dataset Retraining Terbaru</h2>
+					<div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+						<div>
+							<h2 class="h5 fw-bold mb-1">Dataset Retraining Terbaru</h2>
+							<p class="section-subtitle mb-0">Input paling baru yang masuk ke pool data.</p>
+						</div>
+						<span class="stat-icon"><i class="fa-solid fa-layer-group"></i></span>
+					</div>
 					<div class="table-responsive">
-						<table class="table table-sm align-middle mb-0">
+						<table class="table table-sm admin-table responsive-table align-middle mb-0">
 							<thead>
 								<tr>
 									<th>Sumber</th>
@@ -235,16 +181,18 @@
 							<tbody>
 								@forelse($latestDatasets as $dataset)
 									<tr>
-										<td>
-											<div class="fw-bold">{{ $dataset->source_name }}</div>
-											<div class="text-muted small">{{ $dataset->user?->name ?? 'User dihapus' }}</div>
+										<td data-label="Sumber">
+											<div class="table-title">{{ $dataset->source_name }}</div>
+											<div class="muted-line">{{ $dataset->user?->name ?? 'User dihapus' }}</div>
 										</td>
-										<td>{{ $dataset->valid_rows }}</td>
-										<td><span class="badge text-bg-light">{{ $dataset->status }}</span></td>
+										<td data-label="Valid"><span class="metric-pill">{{ $dataset->valid_rows }} baris</span></td>
+										<td data-label="Status">
+											<span class="status-chip status-{{ $statusTone($dataset->status) }}">{{ $dataset->status }}</span>
+										</td>
 									</tr>
 								@empty
 									<tr>
-										<td colspan="3" class="text-muted">Belum ada dataset retraining.</td>
+										<td colspan="3" class="text-muted py-4">Belum ada dataset retraining.</td>
 									</tr>
 								@endforelse
 							</tbody>
@@ -254,9 +202,15 @@
 			</div>
 			<div class="col-lg-6">
 				<div class="admin-card">
-					<h2 class="h5 fw-bold mb-3">History Prediksi Terbaru</h2>
+					<div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+						<div>
+							<h2 class="h5 fw-bold mb-1">History Prediksi Terbaru</h2>
+							<p class="section-subtitle mb-0">Aktivitas prediksi paling baru dari user.</p>
+						</div>
+						<span class="stat-icon"><i class="fa-solid fa-chart-line"></i></span>
+					</div>
 					<div class="table-responsive">
-						<table class="table table-sm align-middle mb-0">
+						<table class="table table-sm admin-table responsive-table align-middle mb-0">
 							<thead>
 								<tr>
 									<th>User</th>
@@ -266,14 +220,24 @@
 							</thead>
 							<tbody>
 								@forelse($latestHistories as $history)
+									@php
+										$isHighRisk = (string) $history->prediction === '1';
+									@endphp
 									<tr>
-										<td>{{ $history->user?->name ?? 'User dihapus' }}</td>
-										<td>{{ $history->model_name ?? '-' }}</td>
-										<td>{{ (string) $history->prediction === '1' ? 'Risiko Tinggi' : 'Risiko Rendah' }}</td>
+										<td data-label="User">
+											<div class="table-title">{{ $history->user?->name ?? 'User dihapus' }}</div>
+										</td>
+										<td data-label="Model"><span class="metric-pill">{{ $history->model_name ?? '-' }}</span></td>
+										<td data-label="Hasil">
+											<span class="status-chip risk-chip {{ $isHighRisk ? 'high' : 'low' }}">
+												<i class="fa-solid {{ $isHighRisk ? 'fa-triangle-exclamation' : 'fa-circle-check' }}"></i>
+												{{ $isHighRisk ? 'Risiko Tinggi' : 'Risiko Rendah' }}
+											</span>
+										</td>
 									</tr>
 								@empty
 									<tr>
-										<td colspan="3" class="text-muted">Belum ada history prediksi.</td>
+										<td colspan="3" class="text-muted py-4">Belum ada history prediksi.</td>
 									</tr>
 								@endforelse
 							</tbody>

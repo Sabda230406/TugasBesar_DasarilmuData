@@ -5,14 +5,15 @@ $mlApiPath = Join-Path $projectRoot "ml-api"
 $laravelPath = Join-Path $projectRoot "laravel-app"
 $venvPython = Join-Path $projectRoot ".venv/Scripts/python.exe"
 
-$portOwnerPid = (Get-NetTCPConnection -LocalPort 5001 -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
-if ($portOwnerPid) {
-    Write-Host "Port 5001 already in use by PID $portOwnerPid" -ForegroundColor Yellow
+$flaskPid = (Get-NetTCPConnection -LocalPort 5001 -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
+if ($flaskPid) {
+    Write-Host "Port 5001 already in use by PID $flaskPid" -ForegroundColor Yellow
 }
 
-$portOwnerPid = (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
-if ($portOwnerPid) {
-    Write-Host "Port 8000 already in use by PID $portOwnerPid" -ForegroundColor Yellow
+$laravelPort = 8000
+while (Get-NetTCPConnection -LocalPort $laravelPort -ErrorAction SilentlyContinue) {
+    Write-Host "Port $laravelPort already in use. Trying next port..." -ForegroundColor Yellow
+    $laravelPort++
 }
 
 $pythonExe = $null
@@ -29,14 +30,19 @@ if (-not $pythonExe) {
     exit 1
 }
 
-Write-Host "Starting Flask API on port 5001..." -ForegroundColor Cyan
-if ($pythonExe -eq "py") {
-    Start-Process -NoNewWindow -WorkingDirectory $mlApiPath -FilePath "py" -ArgumentList "app.py"
-} else {
-    Start-Process -NoNewWindow -WorkingDirectory $mlApiPath -FilePath $pythonExe -ArgumentList "app.py"
+if (-not $flaskPid) {
+    Write-Host "Starting Flask API on port 5001..." -ForegroundColor Cyan
+    if ($pythonExe -eq "py") {
+        Start-Process -WindowStyle Hidden -WorkingDirectory $mlApiPath -FilePath "py" -ArgumentList "app.py"
+    } else {
+        Start-Process -WindowStyle Hidden -WorkingDirectory $mlApiPath -FilePath $pythonExe -ArgumentList "app.py"
+    }
 }
 
-Write-Host "Starting Laravel..." -ForegroundColor Cyan
-Start-Process -NoNewWindow -WorkingDirectory $laravelPath -FilePath "php" -ArgumentList "artisan", "serve"
+Write-Host "Starting Laravel on port $laravelPort..." -ForegroundColor Cyan
+Start-Process -WindowStyle Hidden -WorkingDirectory $laravelPath -FilePath "php" -ArgumentList "artisan", "serve", "--port=$laravelPort"
 
-Write-Host "Both services started. Open http://127.0.0.1:8000" -ForegroundColor Green
+Write-Host "Starting Laravel queue worker..." -ForegroundColor Cyan
+Start-Process -WindowStyle Hidden -WorkingDirectory $laravelPath -FilePath "php" -ArgumentList "artisan", "queue:work", "--tries=1", "--timeout=600"
+
+Write-Host "Services started. Open http://127.0.0.1:$laravelPort" -ForegroundColor Green

@@ -3,11 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\History;
+use App\Models\HistoryRetrainingUsage;
+use App\Models\ModelVersion;
 use App\Models\RetrainingDataset;
+use App\Models\RetrainingRun;
 use App\Models\User;
+use App\Jobs\RunRetrainingJob;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -128,6 +134,7 @@ class AdminController extends Controller
         $models = $this->modelOptions();
         $pool = $this->poolSummary($models);
         $historySummary = $this->historyRetrainingSummary();
+        $latestRun = RetrainingRun::with('user')->latest()->first();
         $status = $request->query('status');
         $source = $request->query('source');
         $search = trim((string) $request->query('search', ''));
@@ -148,6 +155,7 @@ class AdminController extends Controller
             'datasets' => $datasets,
             'statuses' => $this->datasetStatuses(),
             'result' => session('retraining_result'),
+            'latestRun' => $latestRun,
             'filters' => [
                 'status' => $status,
                 'source' => $source,
@@ -165,6 +173,7 @@ class AdminController extends Controller
         }
 
         $storedPath = $this->storeRetrainingRows($historyData['rows'], 'history_predictions');
+        $previewRows = array_map(fn ($row) => collect($row)->except('__history_id')->all(), array_slice($historyData['rows'], 0, 5));
         $dataset = RetrainingDataset::create([
             'user_id' => $request->user()->id,
             'source_type' => 'history',
@@ -175,9 +184,23 @@ class AdminController extends Controller
             'valid_rows' => count($historyData['rows']),
             'stroke_0' => $historyData['stroke_0'],
             'stroke_1' => $historyData['stroke_1'],
-            'preview' => array_slice($historyData['rows'], 0, 5),
+            'preview' => $previewRows,
             'errors' => array_slice($historyData['errors'], 0, 20),
         ]);
+
+        foreach ($historyData['rows'] as $row) {
+            if (! isset($row['__history_id'])) {
+                continue;
+            }
+
+            HistoryRetrainingUsage::firstOrCreate(
+                ['history_id' => $row['__history_id']],
+                [
+                    'retraining_dataset_id' => $dataset->id,
+                    'imported_at' => now(),
+                ]
+            );
+        }
 
         session()->forget('retraining_result');
 
@@ -222,8 +245,186 @@ class AdminController extends Controller
     public function resetRetrainingLock(): RedirectResponse
     {
         $this->clearRetrainingLock();
+        RetrainingRun::whereIn('status', [RetrainingRun::STATUS_QUEUED, RetrainingRun::STATUS_RUNNING])->update([
+            'status' => RetrainingRun::STATUS_FAILED,
+            'stage' => 'failed',
+            'progress' => 100,
+            'message' => 'Status retraining direset admin.',
+            'error_message' => 'Status retraining direset admin.',
+            'finished_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return back()->with('success', 'Status retraining berhasil direset. Jika Flask masih memproses training, tunggu prosesnya selesai sebelum mulai ulang.');
+    }
+
+    public function startRetraining(Request $request): RedirectResponse
+    {
+        $this->syncLegacyModelVersions();
+
+        $validated = $request->validate([
+            'dataset_ids' => ['required', 'array', 'min:1'],
+            'dataset_ids.*' => ['integer', 'exists:retraining_datasets,id'],
+            'models' => ['nullable', 'array'],
+            'models.*' => ['string', 'in:decision_tree,knn,svm'],
+        ], [
+            'dataset_ids.required' => 'Pilih minimal satu dataset valid untuk retraining.',
+        ]);
+
+        $runningRun = RetrainingRun::whereIn('status', [RetrainingRun::STATUS_QUEUED, RetrainingRun::STATUS_RUNNING])->latest()->first();
+        if ($runningRun) {
+            return back()->withErrors(['retraining' => 'Masih ada proses retraining yang berjalan. Pantau progress sebelum mulai lagi.']);
+        }
+
+        $datasets = RetrainingDataset::whereIn('id', $validated['dataset_ids'])
+            ->where('status', RetrainingDataset::STATUS_VALID)
+            ->whereNotNull('stored_path')
+            ->get();
+
+        if ($datasets->count() !== count(array_unique($validated['dataset_ids']))) {
+            return back()->withErrors(['dataset_ids' => 'Hanya dataset berstatus Valid yang belum pernah dipakai yang boleh dipilih.']);
+        }
+
+        $models = $this->modelOptions();
+        $modelKeys = $validated['models'] ?? array_keys(array_filter($models, fn ($model) => $model['available']));
+        $missingModels = array_values(array_filter($modelKeys, fn ($modelKey) => empty($models[$modelKey]['available'])));
+        if ($missingModels !== []) {
+            return back()->withErrors(['models' => 'Ada model yang belum tersedia untuk retraining: ' . implode(', ', $missingModels)]);
+        }
+
+        $selectedPool = $this->poolSummaryForDatasets($datasets, $models);
+        if (! $selectedPool['data_ready']) {
+            return back()->withErrors(['pool' => 'Dataset terpilih belum mencukupi. ' . implode(' ', $selectedPool['missing_messages'])]);
+        }
+
+        $run = RetrainingRun::create([
+            'user_id' => $request->user()->id,
+            'status' => RetrainingRun::STATUS_QUEUED,
+            'stage' => 'queued',
+            'progress' => 5,
+            'message' => 'Retraining masuk antrean.',
+            'selected_dataset_ids' => $datasets->pluck('id')->values()->all(),
+            'selected_model_keys' => array_values($modelKeys),
+        ]);
+
+        RunRetrainingJob::dispatch($run->id);
+
+        session()->forget('retraining_result');
+
+        return back()->with('success', "Retraining #{$run->id} dimulai di background. Kamu boleh pindah halaman, proses tetap berjalan.");
+    }
+
+    public function retrainingRunStatus(?RetrainingRun $run = null)
+    {
+        $run ??= RetrainingRun::latest()->first();
+        if (! $run) {
+            return response()->json(['status' => 'empty']);
+        }
+
+        $payload = $run->toArray();
+        $progressPayload = [];
+        if ($run->progress_path && Storage::exists($run->progress_path)) {
+            $decoded = json_decode((string) Storage::get($run->progress_path), true);
+            if (is_array($decoded)) {
+                $progressPayload = $decoded;
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'run' => array_merge($payload, [
+                'stage' => $progressPayload['stage'] ?? $run->stage,
+                'progress' => $progressPayload['progress'] ?? $run->progress,
+                'message' => $progressPayload['message'] ?? $run->message,
+            ]),
+        ]);
+    }
+
+    public function models(): View
+    {
+        $this->syncLegacyModelVersions();
+
+        $runs = RetrainingRun::query()
+            ->with([
+                'user',
+                'modelVersions' => fn ($query) => $query->orderBy('model_key'),
+            ])
+            ->where('status', RetrainingRun::STATUS_COMPLETED)
+            ->whereHas('modelVersions')
+            ->latest('is_active')
+            ->latest('activated_at')
+            ->latest('finished_at')
+            ->latest()
+            ->get();
+
+        return view('admin.models', [
+            'runs' => $runs,
+            'activeRun' => $runs->firstWhere('is_active', true),
+        ]);
+    }
+
+    public function activateRetrainingRun(RetrainingRun $run): RedirectResponse
+    {
+        if ($run->status !== RetrainingRun::STATUS_COMPLETED) {
+            return back()->withErrors(['model' => 'Hanya retraining yang sudah completed yang bisa dijadikan aktif.']);
+        }
+
+        $versions = $run->modelVersions()
+            ->where('status', '!=', ModelVersion::STATUS_REJECTED)
+            ->orderBy('model_key')
+            ->get();
+
+        if ($versions->isEmpty()) {
+            return back()->withErrors(['model' => 'Retraining ini tidak punya model yang lolos evaluasi untuk diaktifkan.']);
+        }
+
+        foreach ($versions as $version) {
+            if (! $version->artifact_model_path || ! is_file($version->artifact_model_path)) {
+                return back()->withErrors(['model' => "Artefak {$version->model_name} pada retraining #{$run->id} tidak ditemukan."]);
+            }
+
+            $response = Http::timeout(60)->post('http://127.0.0.1:5001/models/activate', [
+                'model_key' => $version->model_key,
+                'version_id' => $version->version_uid,
+            ]);
+
+            if (! $response->ok()) {
+                return back()->withErrors(['model' => "ML API gagal mengaktifkan {$version->model_name}: " . $response->body()]);
+            }
+        }
+
+        RetrainingRun::query()->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+        $run->update([
+            'is_active' => true,
+            'activated_at' => now(),
+        ]);
+
+        ModelVersion::query()->update([
+            'is_default' => false,
+            'updated_at' => now(),
+        ]);
+        ModelVersion::where('status', ModelVersion::STATUS_ACTIVE)
+            ->orWhere('is_active', true)
+            ->update([
+                'status' => ModelVersion::STATUS_AVAILABLE,
+                'is_active' => false,
+                'updated_at' => now(),
+            ]);
+
+        $defaultModelKey = $run->selected_model_keys[0] ?? $versions->first()->model_key;
+        foreach ($versions as $version) {
+            $version->update([
+                'status' => ModelVersion::STATUS_ACTIVE,
+                'is_active' => true,
+                'is_default' => $version->model_key === $defaultModelKey,
+                'activated_at' => now(),
+            ]);
+        }
+
+        return back()->with('success', "Retraining #{$run->id} sekarang aktif. Prediksi memakai paket model dari retraining ini.");
     }
 
     public function exportHistory(): StreamedResponse
@@ -236,7 +437,10 @@ class AdminController extends Controller
 
             fputcsv($output, self::RETRAINING_COLUMNS);
 
-            History::with('user')->oldest()->chunk(500, function ($histories) use ($output) {
+            History::with('user')
+                ->whereDoesntHave('retrainingUsage')
+                ->oldest()
+                ->chunk(500, function ($histories) use ($output) {
                 foreach ($histories as $history) {
                     $row = $this->historyToRetrainingRow($history);
 
@@ -270,16 +474,21 @@ class AdminController extends Controller
     private function historyRetrainingSummary(): array
     {
         $data = $this->collectHistoryRetrainingRows(includeErrors: false);
+        $importedCount = HistoryRetrainingUsage::count();
+        $usedCount = HistoryRetrainingUsage::whereNotNull('used_at')->count();
 
         return [
-            'total_histories' => $data['total_rows'],
+            'total_histories' => History::count(),
+            'available_histories' => $data['total_rows'],
             'valid_rows' => count($data['rows']),
             'stroke_0' => $data['stroke_0'],
             'stroke_1' => $data['stroke_1'],
+            'imported_rows' => $importedCount,
+            'used_rows' => $usedCount,
         ];
     }
 
-    private function collectHistoryRetrainingRows(bool $includeErrors = true): array
+    private function collectHistoryRetrainingRows(bool $includeErrors = true, bool $onlyUnused = true): array
     {
         $rows = [];
         $errors = [];
@@ -287,7 +496,10 @@ class AdminController extends Controller
         $stroke0 = 0;
         $stroke1 = 0;
 
-        History::oldest()->chunk(500, function ($histories) use (&$rows, &$errors, &$totalRows, &$stroke0, &$stroke1, $includeErrors) {
+        History::query()
+            ->when($onlyUnused, fn ($query) => $query->whereDoesntHave('retrainingUsage'))
+            ->oldest()
+            ->chunk(500, function ($histories) use (&$rows, &$errors, &$totalRows, &$stroke0, &$stroke1, $includeErrors) {
             foreach ($histories as $history) {
                 $totalRows++;
                 $row = $this->historyToRetrainingRow($history);
@@ -303,6 +515,7 @@ class AdminController extends Controller
                 }
 
                 $row['stroke'] === 1 ? $stroke1++ : $stroke0++;
+                $row['__history_id'] = $history->id;
                 $rows[] = $row;
             }
         });
@@ -428,16 +641,18 @@ class AdminController extends Controller
             $missingMessages[] = 'Butuh ' . (self::MIN_CLASS_ROWS - $stroke1) . ' data pasien stroke lagi.';
         }
 
+        $availableModels = array_values(array_filter($models, fn ($model) => $model['available']));
         $missingModels = array_values(array_map(
             fn ($model) => $model['name'],
             array_filter($models, fn ($model) => ! $model['available'])
         ));
 
-        foreach ($missingModels as $modelName) {
-            $missingMessages[] = "Model {$modelName} belum tersedia.";
+        if ($availableModels === []) {
+            $missingMessages[] = 'Belum ada model ML yang tersedia untuk retraining.';
         }
 
-        $trainingInProgress = (bool) Cache::get(self::RETRAINING_LOCK_KEY, false);
+        $trainingInProgress = (bool) Cache::get(self::RETRAINING_LOCK_KEY, false)
+            || RetrainingRun::whereIn('status', [RetrainingRun::STATUS_QUEUED, RetrainingRun::STATUS_RUNNING])->exists();
         if ($trainingInProgress) {
             $missingMessages[] = 'Masih ada proses retraining yang sedang berjalan.';
         }
@@ -445,7 +660,7 @@ class AdminController extends Controller
         $dataReady = $totalRows >= self::MIN_TOTAL_ROWS
             && $stroke0 >= self::MIN_CLASS_ROWS
             && $stroke1 >= self::MIN_CLASS_ROWS;
-        $modelsReady = $missingModels === [];
+        $modelsReady = $availableModels !== [];
         $canRetrain = $dataReady && $modelsReady && ! $trainingInProgress;
 
         return [
@@ -463,6 +678,168 @@ class AdminController extends Controller
             'missing_messages' => $missingMessages,
             'status_label' => $canRetrain ? 'Siap retraining' : ($trainingInProgress ? 'Sedang training' : 'Belum siap retraining'),
         ];
+    }
+
+    private function poolSummaryForDatasets($datasets, array $models): array
+    {
+        $totalRows = (int) $datasets->sum('valid_rows');
+        $stroke0 = (int) $datasets->sum('stroke_0');
+        $stroke1 = (int) $datasets->sum('stroke_1');
+        $missingMessages = [];
+
+        if ($totalRows < self::MIN_TOTAL_ROWS) {
+            $missingMessages[] = 'Butuh ' . (self::MIN_TOTAL_ROWS - $totalRows) . ' data valid lagi.';
+        }
+
+        if ($stroke0 < self::MIN_CLASS_ROWS) {
+            $missingMessages[] = 'Butuh ' . (self::MIN_CLASS_ROWS - $stroke0) . ' data pasien tidak stroke lagi.';
+        }
+
+        if ($stroke1 < self::MIN_CLASS_ROWS) {
+            $missingMessages[] = 'Butuh ' . (self::MIN_CLASS_ROWS - $stroke1) . ' data pasien stroke lagi.';
+        }
+
+        return [
+            'total_rows' => $totalRows,
+            'stroke_0' => $stroke0,
+            'stroke_1' => $stroke1,
+            'missing_messages' => $missingMessages,
+            'missing_models' => [],
+            'data_ready' => $totalRows >= self::MIN_TOTAL_ROWS
+                && $stroke0 >= self::MIN_CLASS_ROWS
+                && $stroke1 >= self::MIN_CLASS_ROWS,
+        ];
+    }
+
+    private function syncLegacyModelVersions(): void
+    {
+        $models = $this->modelOptions();
+        $availableModelKeys = array_keys(array_filter($models, fn ($model) => $model['available']));
+        if ($availableModelKeys === []) {
+            return;
+        }
+
+        $hasActiveRun = RetrainingRun::where('is_active', true)->exists();
+        $legacyRun = RetrainingRun::firstOrCreate(
+            ['stage' => 'legacy_baseline'],
+            [
+                'status' => RetrainingRun::STATUS_COMPLETED,
+                'is_active' => ! $hasActiveRun,
+                'progress' => 100,
+                'message' => 'Baseline model sebelum retraining.',
+                'selected_dataset_ids' => [],
+                'selected_model_keys' => $availableModelKeys,
+                'finished_at' => now(),
+                'activated_at' => ! $hasActiveRun ? now() : null,
+            ]
+        );
+
+        if (! $hasActiveRun && ! $legacyRun->is_active) {
+            $legacyRun->update([
+                'is_active' => true,
+                'activated_at' => now(),
+            ]);
+            $legacyRun->refresh();
+        }
+
+        foreach ($models as $modelKey => $model) {
+            if (! $model['available']) {
+                continue;
+            }
+
+            $paths = $this->activeModelArtifactPaths($modelKey);
+            if (! $paths || ! is_file($paths['model'])) {
+                continue;
+            }
+
+            $metrics = is_file($paths['metrics'])
+                ? json_decode((string) file_get_contents($paths['metrics']), true)
+                : [];
+            $metrics = is_array($metrics) ? $metrics : [];
+
+            $versionDir = base_path('../ml-api/model_versions/legacy-' . $modelKey);
+            if (! is_dir($versionDir)) {
+                mkdir($versionDir, 0775, true);
+            }
+
+            $versionPaths = [
+                'model' => $versionDir . DIRECTORY_SEPARATOR . "{$modelKey}_model.pkl",
+                'features' => $versionDir . DIRECTORY_SEPARATOR . "{$modelKey}_feature_columns.json",
+                'metrics' => $versionDir . DIRECTORY_SEPARATOR . "{$modelKey}_metrics.json",
+            ];
+
+            foreach (['model', 'features', 'metrics'] as $type) {
+                if (! is_file($paths[$type] ?? '') || is_file($versionPaths[$type])) {
+                    continue;
+                }
+
+                copy($paths[$type], $versionPaths[$type]);
+            }
+
+            if (! is_file($versionPaths['model']) || ! is_file($versionPaths['features'])) {
+                continue;
+            }
+
+            ModelVersion::updateOrCreate(
+                ['version_uid' => 'legacy-' . $modelKey],
+                [
+                    'model_key' => $modelKey,
+                    'model_name' => $metrics['model_name'] ?? $model['name'],
+                    'status' => $legacyRun->is_active ? ModelVersion::STATUS_ACTIVE : ModelVersion::STATUS_AVAILABLE,
+                    'is_active' => $legacyRun->is_active,
+                    'is_default' => $legacyRun->is_active && $modelKey === $this->defaultModelKey(),
+                    'metrics' => $metrics,
+                    'evaluation_metrics' => $metrics,
+                    'artifact_model_path' => $versionPaths['model'],
+                    'artifact_features_path' => $versionPaths['features'],
+                    'artifact_metrics_path' => is_file($versionPaths['metrics']) ? $versionPaths['metrics'] : null,
+                    'retraining_run_id' => $legacyRun->id,
+                    'activated_at' => $legacyRun->is_active ? ($legacyRun->activated_at ?? now()) : null,
+                ]
+            );
+        }
+    }
+
+    private function activeModelArtifactPaths(string $modelKey): ?array
+    {
+        $basePath = base_path('../ml-api/');
+        $artifacts = [
+            'decision_tree' => [
+                ['model' => 'active_models/decision_tree_model.pkl', 'features' => 'active_models/decision_tree_feature_columns.json', 'metrics' => 'active_models/decision_tree_metrics.json'],
+                ['model' => 'DT_model.pkl', 'features' => 'DT_feature_columns.json', 'metrics' => 'DT_model_metrics.json'],
+                ['model' => 'dt_model.pkl', 'features' => 'dt_feature_columns.json', 'metrics' => 'dt_model_metrics.json'],
+                ['model' => 'model.pkl', 'features' => 'feature_columns.json', 'metrics' => 'model_metrics.json'],
+            ],
+            'knn' => [
+                ['model' => 'active_models/knn_model.pkl', 'features' => 'active_models/knn_feature_columns.json', 'metrics' => 'active_models/knn_metrics.json'],
+                ['model' => 'knn_model.pkl', 'features' => 'knn_feature_columns.json', 'metrics' => 'knn_model_metrics.json'],
+                ['model' => 'KNN_model.pkl', 'features' => 'KNN_feature_columns.json', 'metrics' => 'KNN_model_metrics.json'],
+            ],
+            'svm' => [
+                ['model' => 'active_models/svm_model.pkl', 'features' => 'active_models/svm_feature_columns.json', 'metrics' => 'active_models/svm_metrics.json'],
+                ['model' => 'svm_model.pkl', 'features' => 'svm_feature_columns.json', 'metrics' => 'svm_model_metrics.json'],
+                ['model' => 'SVM_model.pkl', 'features' => 'SVM_feature_columns.json', 'metrics' => 'SVM_model_metrics.json'],
+            ],
+        ];
+
+        if (! isset($artifacts[$modelKey])) {
+            return null;
+        }
+
+        foreach ($artifacts[$modelKey] as $artifact) {
+            $modelPath = $basePath . $artifact['model'];
+            $featuresPath = $basePath . $artifact['features'];
+
+            if (is_file($modelPath) && is_file($featuresPath)) {
+                return [
+                    'model' => $modelPath,
+                    'features' => $featuresPath,
+                    'metrics' => $basePath . $artifact['metrics'],
+                ];
+            }
+        }
+
+        return null;
     }
 
     private function releaseStaleRetrainingLock(): void
@@ -539,6 +916,29 @@ class AdminController extends Controller
         }
 
         return false;
+    }
+
+    private function defaultModelKey(): string
+    {
+        if (Schema::hasTable('model_versions')) {
+            $defaultVersion = ModelVersion::where('is_default', true)->first();
+            if ($defaultVersion) {
+                return $defaultVersion->model_key;
+            }
+        }
+
+        $preferred = env('ML_ACTIVE_MODEL', 'decision_tree');
+        if (is_string($preferred) && $this->modelArtifactAvailable($preferred)) {
+            return $preferred;
+        }
+
+        foreach (array_keys($this->modelOptions()) as $modelKey) {
+            if ($this->modelArtifactAvailable($modelKey)) {
+                return $modelKey;
+            }
+        }
+
+        return 'decision_tree';
     }
 
     private function decodeInputData(?string $inputData): array

@@ -89,6 +89,9 @@ RETRAIN_COLUMNS = FEATURE_COLUMNS + [TARGET_COLUMN]
 NUMERIC_COLUMNS = ["age", "hypertension", "heart_disease", "avg_glucose_level", "bmi"]
 CATEGORICAL_COLUMNS = ["gender", "ever_married", "work_type", "Residence_type", "smoking_status"]
 BASE_DATA_PATH = BASE_DIR.parent / "data" / "healthcare-dataset-stroke-data.csv"
+TRAINING_BASE_PATH = BASE_DIR.parent / "data" / "stroke-training-base.csv"
+EVALUATION_DATA_PATH = BASE_DIR.parent / "data" / "stroke-evaluation-dataset.csv"
+MODEL_VERSION_DIR = BASE_DIR / "model_versions"
 
 
 @dataclass
@@ -453,18 +456,51 @@ def normalize_training_dataframe(df):
 	return df
 
 
+def ensure_training_evaluation_split():
+	if TRAINING_BASE_PATH.exists() and EVALUATION_DATA_PATH.exists():
+		return
+
+	if not BASE_DATA_PATH.exists():
+		raise FileNotFoundError(f"Dataset original tidak ditemukan: {BASE_DATA_PATH}")
+
+	base_df = normalize_training_dataframe(pd.read_csv(BASE_DATA_PATH))
+	train_df, evaluation_df = train_test_split(
+		base_df,
+		test_size=0.2,
+		random_state=42,
+		stratify=base_df[TARGET_COLUMN],
+	)
+
+	TRAINING_BASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+	train_df.to_csv(TRAINING_BASE_PATH, index=False)
+	evaluation_df.to_csv(EVALUATION_DATA_PATH, index=False)
+
+
+def load_training_base_dataframe():
+	ensure_training_evaluation_split()
+
+	if TRAINING_BASE_PATH.exists():
+		return normalize_training_dataframe(pd.read_csv(TRAINING_BASE_PATH))
+
+	return normalize_training_dataframe(pd.read_csv(BASE_DATA_PATH))
+
+
+def load_evaluation_dataframe():
+	ensure_training_evaluation_split()
+
+	if not EVALUATION_DATA_PATH.exists():
+		raise FileNotFoundError(f"Dataset evaluasi tidak ditemukan: {EVALUATION_DATA_PATH}")
+
+	return normalize_training_dataframe(pd.read_csv(EVALUATION_DATA_PATH))
+
+
 def load_retraining_dataframe(dataset_path):
 	path = Path(dataset_path)
 	if not path.exists():
 		raise FileNotFoundError(f"Dataset retraining tidak ditemukan: {path}")
 
 	uploaded_df = normalize_training_dataframe(pd.read_csv(path))
-	frames = []
-
-	if BASE_DATA_PATH.exists():
-		frames.append(normalize_training_dataframe(pd.read_csv(BASE_DATA_PATH)))
-
-	frames.append(uploaded_df)
+	frames = [load_training_base_dataframe(), uploaded_df]
 	combined_df = pd.concat(frames, ignore_index=True)
 	combined_df = combined_df.drop_duplicates(subset=RETRAIN_COLUMNS).reset_index(drop=True)
 
@@ -587,6 +623,27 @@ def train_one_model(model_key, x_train, x_test, y_train, y_test, metadata):
 	return best_model, metrics
 
 
+def evaluate_trained_model(model_key, trained_model, evaluation_df, metadata):
+	x_eval = evaluation_df[FEATURE_COLUMNS]
+	y_eval = evaluation_df[TARGET_COLUMN]
+	y_pred = trained_model.predict(x_eval)
+	report = classification_report(y_eval, y_pred, output_dict=True, zero_division=0)
+	cm = confusion_matrix(y_eval, y_pred, labels=[0, 1]).tolist()
+
+	return {
+		"model_name": MODEL_DEFINITIONS[model_key]["display_name"],
+		"model_key": model_key,
+		"feature_columns": FEATURE_COLUMNS,
+		"accuracy": accuracy_score(y_eval, y_pred),
+		"classification_report": report,
+		"confusion_matrix": cm,
+		"evaluation_rows": int(len(evaluation_df)),
+		"evaluation_dataset": str(EVALUATION_DATA_PATH),
+		"scoring": "fixed_evaluation_dataset",
+		**metadata,
+	}
+
+
 def retrain_artifact_paths(model_key):
 	if model_key == "decision_tree":
 		return {
@@ -653,6 +710,73 @@ def save_retrained_model(model_key, trained_model, metrics):
 	runtime_models.pop(model_key, None)
 
 
+def version_artifact_paths(model_key, version_id):
+	version_dir = MODEL_VERSION_DIR / version_id
+	return {
+		"version_dir": version_dir,
+		"model": version_dir / f"{model_key}_model.pkl",
+		"features": version_dir / f"{model_key}_feature_columns.json",
+		"metrics": version_dir / f"{model_key}_metrics.json",
+	}
+
+
+def save_model_version(model_key, trained_model, metrics, version_id):
+	paths = version_artifact_paths(model_key, version_id)
+	paths["version_dir"].mkdir(parents=True, exist_ok=True)
+
+	feature_payload = {"feature_columns": FEATURE_COLUMNS}
+	metrics = to_jsonable(metrics)
+
+	joblib.dump(trained_model, paths["model"])
+	with open(paths["features"], "w", encoding="utf-8") as file:
+		json.dump(feature_payload, file, indent=4)
+	with open(paths["metrics"], "w", encoding="utf-8") as file:
+		json.dump(metrics, file, indent=4)
+
+	return paths
+
+
+def activate_model_version(model_key, version_id):
+	version_paths = version_artifact_paths(model_key, version_id)
+	if not version_paths["model"].exists() or not version_paths["features"].exists():
+		raise FileNotFoundError(f"Versi model {version_id} untuk {model_key} tidak ditemukan.")
+
+	active_paths = retrain_artifact_paths(model_key)
+	active_paths["active_model"].parent.mkdir(parents=True, exist_ok=True)
+
+	shutil.copy2(version_paths["model"], active_paths["active_model"])
+	shutil.copy2(version_paths["features"], active_paths["active_features"])
+	if version_paths["metrics"].exists():
+		shutil.copy2(version_paths["metrics"], active_paths["active_metrics"])
+
+	shutil.copy2(active_paths["active_model"], active_paths["root_model"])
+	shutil.copy2(active_paths["active_features"], active_paths["root_features"])
+	if active_paths["active_metrics"].exists():
+		shutil.copy2(active_paths["active_metrics"], active_paths["root_metrics"])
+
+	runtime_models.pop(model_key, None)
+	return active_paths
+
+
+def write_progress(progress_path, stage, progress, message):
+	if not progress_path:
+		return
+
+	path = Path(progress_path)
+	path.parent.mkdir(parents=True, exist_ok=True)
+	with open(path, "w", encoding="utf-8") as file:
+		json.dump(
+			{
+				"stage": stage,
+				"progress": progress,
+				"message": message,
+				"updated_at": datetime.now().isoformat(),
+			},
+			file,
+			indent=4,
+		)
+
+
 def nested_metric(metrics, *keys):
 	value = metrics
 	for key in keys:
@@ -693,8 +817,20 @@ def active_model_metrics(model_key):
 	return load_model_metrics(metric_path, MODEL_DEFINITIONS[model_key]["display_name"])
 
 
-def evaluate_model_eligibility(model_key, new_metrics):
-	previous_metrics = active_model_metrics(model_key)
+def active_model_evaluation_metrics(model_key, evaluation_df):
+	try:
+		bundle = get_model_bundle(model_key)
+		metadata = {
+			"evaluated_at": datetime.now().strftime("%Y%m%d-%H%M%S"),
+			"source": "active_model_fixed_evaluation",
+		}
+		return evaluate_trained_model(model_key, bundle.model, evaluation_df, metadata)
+	except (FileNotFoundError, TypeError, ValueError):
+		return active_model_metrics(model_key)
+
+
+def evaluate_model_eligibility(model_key, new_metrics, previous_metrics=None):
+	previous_metrics = previous_metrics or active_model_metrics(model_key)
 	if not previous_metrics:
 		return {
 			"accepted": True,
@@ -772,6 +908,37 @@ def models():
 	)
 
 
+@app.route("/models/activate", methods=["POST"])
+def activate_model():
+	try:
+		data = request.get_json(silent=True) or {}
+		model_key = normalize_model_key(data.get("model_key"))
+		version_id = data.get("version_id")
+
+		if not model_key:
+			return jsonify({"status": "error", "message": "Missing model_key."}), 400
+		if not version_id:
+			return jsonify({"status": "error", "message": "Missing version_id."}), 400
+
+		backup_dir = backup_existing_models([model_key], datetime.now().strftime("%Y%m%d-%H%M%S"))
+		active_paths = activate_model_version(model_key, version_id)
+
+		return jsonify(
+			{
+				"status": "success",
+				"message": "Model version activated.",
+				"model_key": model_key,
+				"version_id": version_id,
+				"backup_dir": str(backup_dir),
+				"active_model_path": str(active_paths["active_model"]),
+			}
+		)
+	except (FileNotFoundError, TypeError, ValueError) as exc:
+		return jsonify({"status": "error", "message": str(exc)}), 400
+	except Exception as exc:  # pylint: disable=broad-except
+		return jsonify({"status": "error", "message": str(exc)}), 500
+
+
 @app.route("/retrain", methods=["POST"])
 def retrain():
 	try:
@@ -779,11 +946,14 @@ def retrain():
 		dataset_path = data.get("dataset_path")
 		model_keys = selected_retrain_models(data.get("models"))
 		uploaded_by = data.get("uploaded_by") or "system"
+		progress_path = data.get("progress_path")
 
 		if not dataset_path:
 			return jsonify({"status": "error", "message": "Missing dataset_path."}), 400
 
+		write_progress(progress_path, "preparing_dataset", 20, "Membaca dataset retraining.")
 		uploaded_df, combined_df = load_retraining_dataframe(dataset_path)
+		evaluation_df = load_evaluation_dataframe()
 		x = combined_df[FEATURE_COLUMNS]
 		y = combined_df[TARGET_COLUMN]
 
@@ -809,8 +979,16 @@ def retrain():
 		}
 
 		trained_results = {}
-		for model_key in model_keys:
-			trained_model, metrics = train_one_model(
+		total_models = len(model_keys)
+		for index, model_key in enumerate(model_keys, start=1):
+			display_name = MODEL_DEFINITIONS[model_key]["display_name"]
+			write_progress(
+				progress_path,
+				f"training_{model_key}",
+				25 + int((index - 1) / max(total_models, 1) * 45),
+				f"Melatih {display_name}.",
+			)
+			trained_model, training_metrics = train_one_model(
 				model_key,
 				x_train,
 				x_test,
@@ -818,36 +996,64 @@ def retrain():
 				y_test,
 				metadata,
 			)
+			evaluation_metrics = evaluate_trained_model(
+				model_key,
+				trained_model,
+				evaluation_df,
+				{
+					**metadata,
+					"training_validation_metrics": to_jsonable(training_metrics),
+				},
+			)
 			trained_results[model_key] = {
 				"model": trained_model,
-				"metrics": metrics,
+				"metrics": evaluation_metrics,
+				"training_metrics": training_metrics,
 			}
 
+		write_progress(progress_path, "evaluating", 78, "Membandingkan metrik model lama dan model baru.")
 		eligibility_results = {
-			model_key: evaluate_model_eligibility(model_key, result["metrics"])
+			model_key: evaluate_model_eligibility(
+				model_key,
+				result["metrics"],
+				active_model_evaluation_metrics(model_key, evaluation_df),
+			)
 			for model_key, result in trained_results.items()
 		}
 		activated = all(result["accepted"] for result in eligibility_results.values())
 		backup_dir = None
 		if activated:
+			write_progress(progress_path, "activating_model", 88, "Model lolos evaluasi. Membackup model lama.")
 			backup_dir = backup_existing_models(model_keys, timestamp)
 
 		response_models = {}
 		for model_key, result in trained_results.items():
+			version_id = f"{timestamp}-{model_key}"
+			version_paths = save_model_version(model_key, result["model"], result["metrics"], version_id)
 			if activated:
-				save_retrained_model(model_key, result["model"], result["metrics"])
+				activate_model_version(model_key, version_id)
 
 			metrics = to_jsonable(result["metrics"])
 			eligibility = to_jsonable(eligibility_results[model_key])
 			response_models[model_key] = {
 				"model_name": metrics["model_name"],
 				"metrics": metrics,
+				"training_metrics": to_jsonable(result["training_metrics"]),
 				"eligibility": {
 					"accepted": eligibility["accepted"],
 					"reasons": eligibility["reasons"],
 				},
 				"previous_metrics": eligibility["previous_metrics"],
+				"version": {
+					"version_id": version_id,
+					"status": "active" if activated and eligibility["accepted"] else ("available" if eligibility["accepted"] else "rejected"),
+					"model_path": str(version_paths["model"]),
+					"features_path": str(version_paths["features"]),
+					"metrics_path": str(version_paths["metrics"]),
+				},
 			}
+
+		write_progress(progress_path, "completed", 100, "Retraining selesai.")
 
 		return jsonify(
 			{
@@ -861,8 +1067,12 @@ def retrain():
 			}
 		)
 	except (FileNotFoundError, TypeError, ValueError) as exc:
+		progress_path = (request.get_json(silent=True) or {}).get("progress_path")
+		write_progress(progress_path, "failed", 100, str(exc))
 		return jsonify({"status": "error", "message": str(exc)}), 400
 	except Exception as exc:  # pylint: disable=broad-except
+		progress_path = (request.get_json(silent=True) or {}).get("progress_path")
+		write_progress(progress_path, "failed", 100, str(exc))
 		return jsonify({"status": "error", "message": str(exc)}), 500
 
 

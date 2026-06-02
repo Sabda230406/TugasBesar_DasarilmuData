@@ -24,92 +24,23 @@
 
 			return number_format($value, 2) . '%';
 		};
+
+		$hasAvailableModel = collect($models)->contains(fn ($model) => $model['available']);
+		$canStartRetraining = ($pool['data_ready'] ?? false)
+			&& ! ($pool['training_in_progress'] ?? false)
+			&& $hasAvailableModel;
 	@endphp
 
-	<style>
-		.admin-page-head {
-			border-radius: 20px;
-			border: 1px solid rgba(22, 163, 74, 0.18);
-			background:
-				radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 30%),
-				linear-gradient(135deg, rgba(236, 253, 245, 0.96), rgba(255, 255, 255, 0.98));
-			padding: 1.4rem;
-			margin-bottom: 1.5rem;
-		}
-
-		.admin-panel {
-			border: 1px solid var(--admin-line);
-			border-radius: 18px;
-			background: #fff;
-			padding: 1.25rem;
-			box-shadow: var(--shadow-sm);
-		}
-
-		.pool-mini-stat {
-			border: 1px solid rgba(187, 247, 208, 0.86);
-			border-radius: 16px;
-			background: #f7fef9;
-			padding: 1rem;
-			height: 100%;
-		}
-
-		.pool-mini-stat span {
-			display: block;
-			color: var(--admin-brand-deep);
-			font-size: 0.76rem;
-			font-weight: 800;
-			text-transform: uppercase;
-			letter-spacing: 0.08em;
-		}
-
-		.pool-mini-stat strong {
-			display: block;
-			font-size: 1.7rem;
-			font-weight: 800;
-			color: var(--admin-text);
-			margin-top: 0.25rem;
-		}
-
-		.pool-mini-stat strong.text-danger {
-			color: var(--admin-brand-deep) !important;
-		}
-
-		.model-chip {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.45rem;
-			border-radius: 999px;
-			padding: 0.5rem 0.8rem;
-			font-weight: 800;
-			font-size: 0.82rem;
-			background: #eef7f1;
-			color: #475569;
-		}
-
-		.model-chip.ready {
-			background: var(--admin-brand-soft);
-			color: var(--admin-brand-deep);
-		}
-
-		.table td,
-		.table th {
-			vertical-align: middle;
-		}
-
-		.preview-box,
-		.error-box {
-			max-width: 360px;
-			white-space: nowrap;
-			overflow: auto;
-		}
-	</style>
-
+	<div class="admin-page-stack">
 	<div class="admin-page-head">
 		<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-			<div>
-				<p class="eyebrow mb-2">Admin Retraining</p>
-				<h1 class="fw-bold mb-2">Retraining dari history prediksi user.</h1>
-				<p class="section-subtitle mb-0">History prediksi dapat diexport atau langsung dimasukkan ke pool retraining dengan label <code>stroke</code> dari hasil prediksi sistem.</p>
+			<div class="d-flex gap-3 align-items-start">
+				<span class="admin-page-icon"><i class="fa-solid fa-database"></i></span>
+				<div>
+					<p class="eyebrow mb-2">Admin Retraining</p>
+					<h1 class="fw-bold mb-2">Retraining dari history prediksi user</h1>
+					<p class="section-subtitle mb-0">Kelola pool data, validasi input, dan jalankan retraining dari history prediksi yang sudah tersimpan.</p>
+				</div>
 			</div>
 			<div class="d-flex flex-wrap gap-2">
 				<a href="{{ route('admin.history.export') }}" class="btn btn-dark">
@@ -137,6 +68,45 @@
 					<li>{{ $error }}</li>
 				@endforeach
 			</ul>
+		</div>
+	@endif
+
+	@if($latestRun)
+		<div class="admin-panel" id="retrainingProgressPanel" data-status-url="{{ route('admin.retraining.runs.show', $latestRun) }}">
+			<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+				<div class="d-flex gap-3 align-items-start">
+					<span class="training-loader {{ $latestRun->status === 'completed' ? 'done' : ($latestRun->status === 'failed' ? 'failed' : '') }}" id="trainingLoader">
+						@if($latestRun->status === 'completed')
+							<i class="fa-solid fa-check"></i>
+						@elseif($latestRun->status === 'failed')
+							<i class="fa-solid fa-xmark"></i>
+						@endif
+					</span>
+					<div>
+						<p class="eyebrow mb-2">Progress Retraining #{{ $latestRun->id }}</p>
+						<h2 class="h5 fw-bold mb-1" id="runStageLabel">{{ $latestRun->message ?? 'Menunggu status retraining.' }}</h2>
+						<p class="section-subtitle mb-0">Proses tetap berjalan meskipun admin pindah halaman.</p>
+					</div>
+				</div>
+				<span class="status-chip status-{{ $latestRun->status === 'failed' ? 'danger' : ($latestRun->status === 'completed' ? 'success' : 'primary') }}" id="runStatusLabel">{{ ucfirst($latestRun->status) }}</span>
+			</div>
+			<div class="progress mt-3" style="height: 10px;">
+				<div class="progress-bar bg-success" id="runProgressBar" style="width: {{ $latestRun->progress }}%"></div>
+			</div>
+			<div class="d-flex justify-content-between mt-2 small fw-bold text-muted">
+				<span id="runStageName">{{ $latestRun->stage ?? '-' }}</span>
+				<span id="runProgressText">{{ $latestRun->progress }}%</span>
+			</div>
+			<div class="progress-step-list" id="progressStepList">
+				<span class="progress-step" data-stage="queued">Queued</span>
+				<span class="progress-step" data-stage="preparing_dataset">Dataset</span>
+				<span class="progress-step" data-stage="training_decision_tree">Decision Tree</span>
+				<span class="progress-step" data-stage="training_knn">KNN</span>
+				<span class="progress-step" data-stage="training_svm">SVM</span>
+				<span class="progress-step" data-stage="evaluating">Evaluasi</span>
+				<span class="progress-step" data-stage="activating_model">Aktivasi</span>
+				<span class="progress-step" data-stage="completed">Selesai</span>
+			</div>
 		</div>
 	@endif
 
@@ -202,16 +172,16 @@
 				<h2 class="h5 fw-bold mb-3">Ambil dari History</h2>
 				<div class="row g-2 mb-3">
 					<div class="col-4">
-						<div class="text-muted small fw-bold">History</div>
-						<div class="h4 fw-bold mb-0">{{ $historySummary['total_histories'] ?? 0 }}</div>
-					</div>
-					<div class="col-4">
-						<div class="text-muted small fw-bold">Valid</div>
+						<div class="text-muted small fw-bold">Baru</div>
 						<div class="h4 fw-bold mb-0">{{ $historySummary['valid_rows'] ?? 0 }}</div>
 					</div>
 					<div class="col-4">
-						<div class="text-muted small fw-bold">Stroke 1</div>
-						<div class="h4 fw-bold text-success mb-0">{{ $historySummary['stroke_1'] ?? 0 }}</div>
+						<div class="text-muted small fw-bold">Masuk Pool</div>
+						<div class="h4 fw-bold mb-0">{{ $historySummary['imported_rows'] ?? 0 }}</div>
+					</div>
+					<div class="col-4">
+						<div class="text-muted small fw-bold">Terpakai</div>
+						<div class="h4 fw-bold text-success mb-0">{{ $historySummary['used_rows'] ?? 0 }}</div>
 					</div>
 				</div>
 				<form action="{{ route('admin.retraining.history.import') }}" method="POST" class="mb-3" onsubmit="return confirm('Masukkan seluruh history prediksi valid ke pool retraining?')">
@@ -224,7 +194,7 @@
 					<i class="fa-solid fa-download me-2"></i>Download CSV History
 				</a>
 				<div class="small text-muted mb-4">
-					Data history yang valid memakai fitur pasien dari input user dan label <code>stroke</code> dari hasil prediksi sistem.
+					Hanya history baru yang belum pernah masuk pool yang bisa di-import atau di-download sebagai CSV retraining.
 				</div>
 
 				<hr>
@@ -238,12 +208,9 @@
 						</span>
 					@endforeach
 				</div>
-				<form action="{{ route('retraining.start') }}" method="POST" class="mb-3">
-					@csrf
-					<button class="btn btn-dark w-100 py-2" type="submit" @disabled(! $pool['can_retrain'])>
-						<i class="fa-solid fa-rotate me-2"></i>Mulai Retraining Semua Model
-					</button>
-				</form>
+				<a href="#dataset-selection" class="btn btn-dark w-100 py-2 mb-3 {{ ($pool['training_in_progress'] ?? false) ? 'disabled' : '' }}">
+					<i class="fa-solid fa-list-check me-2"></i>Pilih Dataset Retraining
+				</a>
 				@if($pool['training_in_progress'] ?? false)
 					<form action="{{ route('admin.retraining.reset-lock') }}" method="POST" class="mb-3" onsubmit="return confirm('Reset status training? Pakai ini hanya kalau proses sebelumnya error/timeout dan Flask sudah tidak memproses retraining.')">
 						@csrf
@@ -268,7 +235,7 @@
 			</div>
 			@if(! empty($result['models']) && is_array($result['models']))
 				<div class="table-responsive">
-					<table class="table table-sm align-middle mb-0">
+					<table class="table table-sm admin-table responsive-table align-middle mb-0">
 						<thead>
 							<tr>
 								<th>Model</th>
@@ -286,14 +253,14 @@
 									$eligibility = $modelResult['eligibility'] ?? [];
 								@endphp
 								<tr>
-									<td class="fw-bold">{{ $modelResult['model_name'] ?? str_replace('_', ' ', $modelKey) }}</td>
-									<td>{{ $formatMetric($metrics['accuracy'] ?? null) }}</td>
-									<td>{{ $formatMetric($metrics['recall_stroke'] ?? null) }}</td>
-									<td>{{ $formatMetric($metrics['f1_stroke'] ?? null) }}</td>
-									<td>{{ $metrics['false_negative'] ?? '-' }}</td>
-									<td>
-										<span class="badge text-bg-{{ ($eligibility['eligible'] ?? true) ? 'success' : 'warning' }}">
-											{{ ($eligibility['eligible'] ?? true) ? 'Layak' : 'Ditolak' }}
+									<td data-label="Model" class="fw-bold">{{ $modelResult['model_name'] ?? str_replace('_', ' ', $modelKey) }}</td>
+									<td data-label="Accuracy">{{ $formatMetric($metrics['accuracy'] ?? null) }}</td>
+									<td data-label="Recall Stroke">{{ $formatMetric($metrics['recall_stroke'] ?? null) }}</td>
+									<td data-label="F1 Stroke">{{ $formatMetric($metrics['f1_stroke'] ?? null) }}</td>
+									<td data-label="False Negative">{{ $metrics['false_negative'] ?? '-' }}</td>
+									<td data-label="Status">
+										<span class="status-chip status-{{ ($eligibility['accepted'] ?? true) ? 'success' : 'warning' }}">
+											{{ ($eligibility['accepted'] ?? true) ? 'Layak' : 'Ditolak' }}
 										</span>
 									</td>
 								</tr>
@@ -305,15 +272,26 @@
 		</div>
 	@endif
 
-	<div class="admin-panel">
+	<div class="admin-panel" id="dataset-selection">
 		<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-			<div>
-				<h2 class="h5 fw-bold mb-1">Daftar Dataset/Input Retraining</h2>
-				<p class="section-subtitle mb-0">Data valid dihitung ke pool, archived tidak dihitung, invalid disimpan sebagai catatan error.</p>
+			<div class="d-flex gap-3 align-items-start">
+				<span class="stat-icon"><i class="fa-solid fa-table-list"></i></span>
+				<div>
+					<h2 class="h5 fw-bold mb-1">Daftar Dataset/Input Retraining</h2>
+					<p class="section-subtitle mb-0">Pilih dataset Valid yang mau digabung untuk retraining. Dataset Used, Invalid, dan Archived tidak bisa dipilih.</p>
+				</div>
+			</div>
+			<div class="d-flex flex-wrap gap-2">
+				<a href="{{ route('admin.models') }}" class="btn btn-outline-dark">
+					<i class="fa-solid fa-layer-group me-2"></i>Lihat Paket Model
+				</a>
+				<button class="btn btn-dark" type="submit" form="retrainingStartForm" @disabled(! $canStartRetraining)>
+					<i class="fa-solid fa-play me-2"></i>Mulai Retraining
+				</button>
 			</div>
 		</div>
 
-		<form class="row g-3 align-items-end mb-4" method="GET" action="{{ route('admin.retraining') }}">
+		<form class="filter-card row g-3 align-items-end mb-4" method="GET" action="{{ route('admin.retraining') }}">
 			<div class="col-md-4">
 				<label class="form-label fw-bold" for="search">Cari sumber</label>
 				<input id="search" class="form-control" type="search" name="search" value="{{ $filters['search'] }}" placeholder="Nama file atau input">
@@ -337,101 +315,230 @@
 				</select>
 			</div>
 			<div class="col-md-2 d-grid">
-				<button class="btn btn-dark" type="submit">Filter</button>
+				<button class="btn btn-dark" type="submit">
+					<i class="fa-solid fa-filter me-2"></i>Filter
+				</button>
 			</div>
 		</form>
 
-		<div class="table-responsive">
-			<table class="table align-middle">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Sumber</th>
-						<th>Uploader</th>
-						<th>Tanggal</th>
-						<th>Valid</th>
-						<th>Tidak Stroke</th>
-						<th>Stroke</th>
-						<th>Status</th>
-						<th>Detail</th>
-						<th class="text-end">Aksi</th>
-					</tr>
-				</thead>
-				<tbody>
-					@forelse($datasets as $dataset)
+		<form id="retrainingStartForm" action="{{ route('admin.retraining.start') }}" method="POST">
+			@csrf
+
+			<div class="filter-card mb-4">
+				<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+					<div>
+						<h3 class="h6 fw-bold mb-1">Model yang dilatih</h3>
+						<p class="section-subtitle mb-0">Model yang tersedia otomatis dipilih. Kamu bisa lepas centang kalau hanya ingin retraining model tertentu.</p>
+					</div>
+					<span class="status-chip status-primary"><span id="selectedDatasetCount">0</span> dataset dipilih</span>
+				</div>
+				<div class="d-flex flex-wrap gap-2 mt-3">
+					@foreach($models as $modelKey => $model)
+						<label class="model-chip {{ $model['available'] ? 'ready' : '' }}">
+							<input class="form-check-input m-0" type="checkbox" name="models[]" value="{{ $modelKey }}" @checked($model['available']) @disabled(! $model['available'] || ($pool['training_in_progress'] ?? false))>
+							<i class="fa-solid {{ $model['icon'] }}"></i>
+							{{ $model['name'] }}
+						</label>
+					@endforeach
+				</div>
+			</div>
+
+			<div class="table-responsive">
+				<table class="table admin-table responsive-table align-middle">
+					<thead>
 						<tr>
-							<td class="fw-bold">#{{ $dataset->id }}</td>
-							<td>
-								<div class="fw-bold">{{ $dataset->source_name }}</div>
-								<div class="text-muted small">
-									@switch($dataset->source_type)
-										@case('manual')
-											Input manual
-											@break
-										@case('history')
-											History prediksi
-											@break
-										@default
-											Upload file
-									@endswitch
-								</div>
-							</td>
-							<td>{{ $dataset->user?->name ?? 'User dihapus' }}</td>
-							<td>{{ optional($dataset->created_at)->format('d M Y H:i') }}</td>
-							<td>{{ $dataset->valid_rows }}</td>
-							<td>{{ $dataset->stroke_0 }}</td>
-							<td>{{ $dataset->stroke_1 }}</td>
-							<td><span class="badge text-bg-{{ $statusTone($dataset->status) }}">{{ $dataset->status }}</span></td>
-							<td>
-								<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#datasetDetail{{ $dataset->id }}" aria-expanded="false">
-									Lihat
-								</button>
-							</td>
-							<td class="text-end">
-								@if(in_array($dataset->status, ['Valid', 'Invalid'], true))
-									<form action="{{ route('admin.retraining.archive', $dataset) }}" method="POST" class="d-inline" onsubmit="return confirm('Archive dataset ini? Data tidak dihapus, hanya tidak dihitung ke pool.')">
-										@csrf
-										<button class="btn btn-sm btn-outline-secondary" type="submit">
+							<th>Pilih</th>
+							<th>ID</th>
+							<th>Sumber</th>
+							<th>Uploader</th>
+							<th>Tanggal</th>
+							<th>Valid</th>
+							<th>Tidak Stroke</th>
+							<th>Stroke</th>
+							<th>Status</th>
+							<th>Detail</th>
+							<th class="text-end">Aksi</th>
+						</tr>
+					</thead>
+					<tbody>
+						@forelse($datasets as $dataset)
+							@php
+								$sourceIcon = match ($dataset->source_type) {
+									'manual' => 'fa-keyboard',
+									'history' => 'fa-clock-rotate-left',
+									default => 'fa-file-arrow-up',
+								};
+								$canSelect = $dataset->status === 'Valid' && ! ($pool['training_in_progress'] ?? false);
+							@endphp
+							<tr>
+								<td data-label="Pilih">
+									<input class="form-check-input dataset-checkbox" type="checkbox" name="dataset_ids[]" value="{{ $dataset->id }}" @disabled(! $canSelect)>
+								</td>
+								<td data-label="ID" class="fw-bold">#{{ $dataset->id }}</td>
+								<td data-label="Sumber">
+									<div class="entity-cell">
+										<span class="entity-avatar">
+											<i class="fa-solid {{ $sourceIcon }}"></i>
+										</span>
+										<div>
+											<div class="table-title">{{ $dataset->source_name }}</div>
+											<div class="muted-line">
+												@switch($dataset->source_type)
+													@case('manual')
+														Input manual
+														@break
+													@case('history')
+														History prediksi
+														@break
+													@default
+														Upload file
+												@endswitch
+											</div>
+										</div>
+									</div>
+								</td>
+								<td data-label="Uploader">{{ $dataset->user?->name ?? 'User dihapus' }}</td>
+								<td data-label="Tanggal">{{ optional($dataset->created_at)->format('d M Y H:i') }}</td>
+								<td data-label="Valid"><span class="metric-pill">{{ $dataset->valid_rows }}</span></td>
+								<td data-label="Tidak Stroke"><span class="metric-pill">{{ $dataset->stroke_0 }}</span></td>
+								<td data-label="Stroke"><span class="metric-pill">{{ $dataset->stroke_1 }}</span></td>
+								<td data-label="Status">
+									<span class="status-chip status-{{ $statusTone($dataset->status) }}">{{ $dataset->status }}</span>
+								</td>
+								<td data-label="Detail">
+									<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#datasetDetail{{ $dataset->id }}" aria-expanded="false">
+										<i class="fa-solid fa-eye me-1"></i>Lihat
+									</button>
+								</td>
+								<td data-label="Aksi" class="text-end">
+									@if(in_array($dataset->status, ['Valid', 'Invalid'], true))
+										<button class="btn btn-sm btn-outline-secondary" type="submit" formaction="{{ route('admin.retraining.archive', $dataset) }}" formmethod="POST" onclick="return confirm('Archive dataset ini? Data tidak dihapus, hanya tidak dihitung ke pool.')">
 											<i class="fa-solid fa-box-archive me-1"></i>Archive
 										</button>
-									</form>
-								@elseif($dataset->status === 'Archived')
-									<form action="{{ route('admin.retraining.restore', $dataset) }}" method="POST" class="d-inline" onsubmit="return confirm('Restore dataset ini ke pool valid?')">
-										@csrf
-										<button class="btn btn-sm btn-outline-success" type="submit">
+									@elseif($dataset->status === 'Archived')
+										<button class="btn btn-sm btn-outline-success" type="submit" formaction="{{ route('admin.retraining.restore', $dataset) }}" formmethod="POST" onclick="return confirm('Restore dataset ini ke pool valid?')">
 											<i class="fa-solid fa-rotate-left me-1"></i>Restore
 										</button>
-									</form>
-								@else
-									<span class="text-muted small">-</span>
-								@endif
-							</td>
-						</tr>
-						<tr class="collapse" id="datasetDetail{{ $dataset->id }}">
-							<td colspan="10">
-								<div class="row g-3">
-									<div class="col-lg-6">
-										<h3 class="h6 fw-bold">Preview Dataset</h3>
-										<pre class="preview-box bg-light border rounded p-3 mb-0">{{ json_encode($dataset->preview ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+									@else
+										<span class="text-muted small">-</span>
+									@endif
+								</td>
+							</tr>
+							<tr class="collapse detail-row" id="datasetDetail{{ $dataset->id }}">
+								<td colspan="11">
+									<div class="row g-3">
+										<div class="col-lg-6">
+											<h3 class="h6 fw-bold">Preview Dataset</h3>
+											<pre class="preview-box bg-light border rounded p-3 mb-0">{{ json_encode($dataset->preview ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+										</div>
+										<div class="col-lg-6">
+											<h3 class="h6 fw-bold">Error Validasi</h3>
+											<pre class="error-box bg-light border rounded p-3 mb-0">{{ json_encode($dataset->errors ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+										</div>
 									</div>
-									<div class="col-lg-6">
-										<h3 class="h6 fw-bold">Error Validasi</h3>
-										<pre class="error-box bg-light border rounded p-3 mb-0">{{ json_encode($dataset->errors ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-									</div>
-								</div>
-							</td>
-						</tr>
-					@empty
-						<tr>
-							<td colspan="10" class="text-center text-muted py-4">Belum ada dataset retraining.</td>
-						</tr>
-					@endforelse
-				</tbody>
-			</table>
-		</div>
+								</td>
+							</tr>
+						@empty
+							<tr>
+								<td colspan="11" class="text-center text-muted py-4">Belum ada dataset retraining.</td>
+							</tr>
+						@endforelse
+					</tbody>
+				</table>
+			</div>
+		</form>
 
 		<div class="mt-3">
 			{{ $datasets->links() }}
 		</div>
 	</div>
+	</div>
+
+	<script>
+		document.addEventListener('DOMContentLoaded', () => {
+			const checkboxes = document.querySelectorAll('.dataset-checkbox');
+			const selectedCount = document.getElementById('selectedDatasetCount');
+			const updateSelectedCount = () => {
+				if (! selectedCount) {
+					return;
+				}
+
+				selectedCount.textContent = Array.from(checkboxes).filter((checkbox) => checkbox.checked).length;
+			};
+			checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateSelectedCount));
+			updateSelectedCount();
+
+			const panel = document.getElementById('retrainingProgressPanel');
+			if (! panel) {
+				return;
+			}
+
+			const statusUrl = panel.dataset.statusUrl;
+			const stageLabel = document.getElementById('runStageLabel');
+			const statusLabel = document.getElementById('runStatusLabel');
+			const stageName = document.getElementById('runStageName');
+			const progressText = document.getElementById('runProgressText');
+			const progressBar = document.getElementById('runProgressBar');
+			const loader = document.getElementById('trainingLoader');
+			const steps = Array.from(document.querySelectorAll('.progress-step'));
+			const stageOrder = [
+				'queued',
+				'preparing_dataset',
+				'training_models',
+				'training_decision_tree',
+				'training_knn',
+				'training_svm',
+				'evaluating',
+				'activating_model',
+				'completed',
+				'completed_not_activated',
+				'failed',
+			];
+
+			const applyRun = (run) => {
+				const status = run.status || 'queued';
+				const stage = run.stage || status;
+				const progress = Number(run.progress || 0);
+				const currentIndex = stageOrder.indexOf(stage);
+
+				stageLabel.textContent = run.message || 'Retraining sedang diproses.';
+				statusLabel.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+				statusLabel.className = `status-chip status-${status === 'failed' ? 'danger' : (status === 'completed' ? 'success' : 'primary')}`;
+				stageName.textContent = stage.replaceAll('_', ' ');
+				progressText.textContent = `${progress}%`;
+				progressBar.style.width = `${progress}%`;
+
+				loader.className = `training-loader ${status === 'completed' ? 'done' : (status === 'failed' ? 'failed' : '')}`;
+				loader.innerHTML = status === 'completed'
+					? '<i class="fa-solid fa-check"></i>'
+					: (status === 'failed' ? '<i class="fa-solid fa-xmark"></i>' : '');
+
+				steps.forEach((step) => {
+					const stepIndex = stageOrder.indexOf(step.dataset.stage);
+					step.classList.toggle('active', step.dataset.stage === stage);
+					step.classList.toggle('done', currentIndex > -1 && stepIndex > -1 && stepIndex < currentIndex);
+				});
+			};
+
+			const pollRun = async () => {
+				try {
+					const response = await fetch(statusUrl);
+					const payload = await response.json();
+					if (payload.status !== 'success' || ! payload.run) {
+						return;
+					}
+
+					applyRun(payload.run);
+					if (['completed', 'failed'].includes(payload.run.status)) {
+						clearInterval(interval);
+					}
+				} catch (error) {
+					console.error(error);
+				}
+			};
+
+			const interval = setInterval(pollRun, 2500);
+			pollRun();
+		});
+	</script>
 @endsection

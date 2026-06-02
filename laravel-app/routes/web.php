@@ -29,16 +29,21 @@ Route::middleware('auth')->group(function () {
         Route::patch('/admin/users/{user}', [AdminController::class, 'updateUser'])->name('admin.users.update');
         Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
         Route::get('/admin/retraining', [AdminController::class, 'retraining'])->name('admin.retraining');
+        Route::post('/admin/retraining/start', [AdminController::class, 'startRetraining'])->name('admin.retraining.start');
+        Route::get('/admin/retraining/runs/status', [AdminController::class, 'retrainingRunStatus'])->name('admin.retraining.runs.status');
+        Route::get('/admin/retraining/runs/{run}/status', [AdminController::class, 'retrainingRunStatus'])->name('admin.retraining.runs.show');
         Route::post('/admin/retraining/history/import', [AdminController::class, 'importHistoryToRetraining'])->name('admin.retraining.history.import');
         Route::post('/admin/retraining/reset-lock', [AdminController::class, 'resetRetrainingLock'])->name('admin.retraining.reset-lock');
         Route::post('/admin/retraining/datasets/{dataset}/archive', [AdminController::class, 'archiveDataset'])->name('admin.retraining.archive');
         Route::post('/admin/retraining/datasets/{dataset}/restore', [AdminController::class, 'restoreDataset'])->name('admin.retraining.restore');
         Route::get('/admin/history/export', [AdminController::class, 'exportHistory'])->name('admin.history.export');
+        Route::get('/admin/models', [AdminController::class, 'models'])->name('admin.models');
+        Route::post('/admin/models/runs/{run}/activate', [AdminController::class, 'activateRetrainingRun'])->name('admin.models.runs.activate');
 
         Route::get('/retraining', fn () => redirect()->route('admin.retraining'))->name('retraining');
         Route::post('/retraining/upload', [RetrainingController::class, 'upload'])->name('retraining.upload');
         Route::post('/retraining/manual', [RetrainingController::class, 'manual'])->name('retraining.manual');
         Route::post('/retraining/datasets/{dataset}/archive', [RetrainingController::class, 'archive'])->name('retraining.archive');
-        Route::post('/retraining/start', [RetrainingController::class, 'start'])->name('retraining.start');
+        Route::post('/retraining/start', [AdminController::class, 'startRetraining'])->name('retraining.start');
     });
 });

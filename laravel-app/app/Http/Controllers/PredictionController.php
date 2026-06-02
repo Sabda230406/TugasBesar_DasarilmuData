@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\History;
+use App\Models\ModelVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -502,6 +503,7 @@ class PredictionController extends Controller
 				'icon' => 'fa-tree',
 				'aliases' => ['decision_tree', 'decision-tree', 'dt', 'tree', 'Decision Tree'],
 				'artifacts' => [
+					['model' => 'active_models/decision_tree_model.pkl', 'features' => 'active_models/decision_tree_feature_columns.json', 'metrics' => 'active_models/decision_tree_metrics.json'],
 					['model' => 'DT_model.pkl', 'features' => 'DT_feature_columns.json', 'metrics' => 'DT_model_metrics.json'],
 					['model' => 'dt_model.pkl', 'features' => 'dt_feature_columns.json', 'metrics' => 'dt_model_metrics.json'],
 					['model' => 'model.pkl', 'features' => 'feature_columns.json', 'metrics' => 'model_metrics.json'],
@@ -512,6 +514,7 @@ class PredictionController extends Controller
 				'icon' => 'fa-diagram-project',
 				'aliases' => ['knn', 'KNN'],
 				'artifacts' => [
+					['model' => 'active_models/knn_model.pkl', 'features' => 'active_models/knn_feature_columns.json', 'metrics' => 'active_models/knn_metrics.json'],
 					['model' => 'knn_model.pkl', 'features' => 'knn_feature_columns.json', 'metrics' => 'knn_model_metrics.json'],
 					['model' => 'KNN_model.pkl', 'features' => 'KNN_feature_columns.json', 'metrics' => 'KNN_model_metrics.json'],
 				],
@@ -521,6 +524,7 @@ class PredictionController extends Controller
 				'icon' => 'fa-vector-square',
 				'aliases' => ['svm', 'SVM'],
 				'artifacts' => [
+					['model' => 'active_models/svm_model.pkl', 'features' => 'active_models/svm_feature_columns.json', 'metrics' => 'active_models/svm_metrics.json'],
 					['model' => 'svm_model.pkl', 'features' => 'svm_feature_columns.json', 'metrics' => 'svm_model_metrics.json'],
 					['model' => 'SVM_model.pkl', 'features' => 'SVM_feature_columns.json', 'metrics' => 'SVM_model_metrics.json'],
 				],
@@ -556,6 +560,13 @@ class PredictionController extends Controller
 
 	private function defaultModelKey(): string
 	{
+		if (Schema::hasTable('model_versions')) {
+			$activeVersion = ModelVersion::where('is_default', true)->first();
+			if ($activeVersion && $this->modelIsAvailable($activeVersion->model_key)) {
+				return $activeVersion->model_key;
+			}
+		}
+
 		try {
 			$preferred = $this->canonicalModelKey(env('ML_ACTIVE_MODEL', 'decision_tree')) ?? 'decision_tree';
 		} catch (Throwable) {
