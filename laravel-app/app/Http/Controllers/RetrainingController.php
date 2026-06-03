@@ -633,19 +633,19 @@ class RetrainingController extends Controller
 		$basePath = base_path('../ml-api/');
 		$artifacts = [
 			'decision_tree' => [
+				['model' => 'active_models/decision_tree_model.pkl', 'features' => 'active_models/decision_tree_feature_columns.json'],
 				['model' => 'DT_model.pkl', 'features' => 'DT_feature_columns.json'],
 				['model' => 'model.pkl', 'features' => 'feature_columns.json'],
-				['model' => 'active_models/decision_tree_model.pkl', 'features' => 'active_models/decision_tree_feature_columns.json'],
 			],
 			'knn' => [
+				['model' => 'active_models/knn_model.pkl', 'features' => 'active_models/knn_feature_columns.json'],
 				['model' => 'knn_model.pkl', 'features' => 'knn_feature_columns.json'],
 				['model' => 'KNN_model.pkl', 'features' => 'KNN_feature_columns.json'],
-				['model' => 'active_models/knn_model.pkl', 'features' => 'active_models/knn_feature_columns.json'],
 			],
 			'svm' => [
+				['model' => 'active_models/svm_model.pkl', 'features' => 'active_models/svm_feature_columns.json'],
 				['model' => 'svm_model.pkl', 'features' => 'svm_feature_columns.json'],
 				['model' => 'SVM_model.pkl', 'features' => 'SVM_feature_columns.json'],
-				['model' => 'active_models/svm_model.pkl', 'features' => 'active_models/svm_feature_columns.json'],
 			],
 		];
 

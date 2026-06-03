@@ -1,6 +1,5 @@
 {
     "model_name": "Decision Tree",
-    "model_key": "decision_tree",
     "feature_columns": [
         "gender",
         "age",
@@ -13,60 +12,52 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.7197549770290965,
+    "accuracy": 0.6651017214397497,
     "classification_report": {
         "0": {
-            "precision": 0.9853932584269663,
-            "recall": 0.7130081300813008,
-            "f1-score": 0.8273584905660377,
-            "support": 1230.0
+            "precision": 0.984029484029484,
+            "recall": 0.6587171052631579,
+            "f1-score": 0.7891625615763547,
+            "support": 1216.0
         },
         "1": {
-            "precision": 0.15144230769230768,
-            "recall": 0.8289473684210527,
-            "f1-score": 0.25609756097560976,
-            "support": 76.0
+            "precision": 0.10560344827586207,
+            "recall": 0.7903225806451613,
+            "f1-score": 0.18631178707224336,
+            "support": 62.0
         },
-        "accuracy": 0.7197549770290965,
+        "accuracy": 0.6651017214397497,
         "macro avg": {
-            "precision": 0.568417783059637,
-            "recall": 0.7709777492511767,
-            "f1-score": 0.5417280257708237,
-            "support": 1306.0
+            "precision": 0.544816466152673,
+            "recall": 0.7245198429541595,
+            "f1-score": 0.487737174324299,
+            "support": 1278.0
         },
         "weighted avg": {
-            "precision": 0.9368631877869711,
-            "recall": 0.7197549770290965,
-            "f1-score": 0.794115128660316,
-            "support": 1306.0
+            "precision": 0.9414141364420626,
+            "recall": 0.6651017214397497,
+            "f1-score": 0.7599162798711473,
+            "support": 1278.0
         }
     },
     "confusion_matrix": [
         [
-            877,
-            353
+            801,
+            415
         ],
         [
             13,
-            63
+            49
         ]
     ],
     "best_params": {
         "model__class_weight": null,
         "model__criterion": "gini",
         "model__max_depth": 5,
-        "model__min_samples_leaf": 1,
+        "model__min_samples_leaf": 4,
         "model__min_samples_split": 2
     },
     "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
     "scoring": "f1",
-    "random_state": 42,
-    "retrained_at": "20260601-213444",
-    "trained_by": "Sabda Putra Aribawa",
-    "uploaded_rows": 137,
-    "combined_rows": 5221,
-    "training_rows": 3915,
-    "test_rows": 1306,
-    "stroke_0_count": 4916,
-    "stroke_1_count": 305
+    "random_state": 42
 }

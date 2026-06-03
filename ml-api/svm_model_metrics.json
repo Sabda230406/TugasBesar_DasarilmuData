@@ -1,6 +1,5 @@
 {
     "model_name": "SVM",
-    "model_key": "svm",
     "feature_columns": [
         "gender",
         "age",
@@ -13,58 +12,51 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.7404287901990811,
+    "accuracy": 0.7206572769953051,
     "classification_report": {
         "0": {
-            "precision": 0.9858233369683751,
-            "recall": 0.734959349593496,
-            "f1-score": 0.8421052631578947,
-            "support": 1230.0
+            "precision": 0.9842164599774521,
+            "recall": 0.7179276315789473,
+            "f1-score": 0.8302425106990015,
+            "support": 1216.0
         },
         "1": {
-            "precision": 0.16195372750642673,
-            "recall": 0.8289473684210527,
-            "f1-score": 0.2709677419354839,
-            "support": 76.0
+            "precision": 0.12276214833759591,
+            "recall": 0.7741935483870968,
+            "f1-score": 0.2119205298013245,
+            "support": 62.0
         },
-        "accuracy": 0.7404287901990811,
+        "accuracy": 0.7206572769953051,
         "macro avg": {
-            "precision": 0.5738885322374009,
-            "recall": 0.7819533590072743,
-            "f1-score": 0.5565365025466893,
-            "support": 1306.0
+            "precision": 0.553489304157524,
+            "recall": 0.746060589983022,
+            "f1-score": 0.521081520250163,
+            "support": 1278.0
         },
         "weighted avg": {
-            "precision": 0.9378799293733461,
-            "recall": 0.7404287901990811,
-            "f1-score": 0.8088690827498523,
-            "support": 1306.0
+            "precision": 0.9424244667680067,
+            "recall": 0.7206572769953051,
+            "f1-score": 0.8002456696851861,
+            "support": 1278.0
         }
     },
     "confusion_matrix": [
         [
-            904,
-            326
+            873,
+            343
         ],
         [
-            13,
-            63
+            14,
+            48
         ]
     ],
     "best_params": {
         "model__C": 1,
         "model__class_weight": null,
+        "model__gamma": "scale",
         "model__kernel": "linear"
     },
     "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
     "scoring": "f1",
-    "random_state": 42,
-    "retrained_at": "20260601-213444",
-    "trained_by": "Sabda Putra Aribawa",
-    "uploaded_rows": 137,
-    "combined_rows": 5221,
-    "training_rows": 3915,
-    "test_rows": 1306,
-    "stroke_0_count": 4916,
-    "stroke_1_count": 305
+    "random_state": 42
 }
