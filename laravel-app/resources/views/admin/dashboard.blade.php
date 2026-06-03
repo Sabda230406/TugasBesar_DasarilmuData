@@ -92,7 +92,7 @@
 						</a>
 						<a href="{{ route('admin.models') }}" class="quick-action">
 							<i class="fa-solid fa-brain"></i>
-							<span>Paket Retraining Aktif</span>
+							<span>Manajemen Model</span>
 						</a>
 						<a href="{{ route('admin.history.export') }}" class="quick-action">
 							<i class="fa-solid fa-download"></i>
@@ -134,9 +134,9 @@
 						@endforeach
 					</div>
 					<hr>
-					<p class="section-subtitle mb-3">Admin bisa memilih paket hasil retraining yang dipakai sistem, lalu melihat metrik model di dalamnya.</p>
+					<p class="section-subtitle mb-3">Admin bisa membandingkan versi model dan memilih default prediksi dari halaman manajemen model.</p>
 					<a href="{{ route('admin.models') }}" class="btn btn-outline-dark w-100">
-						<i class="fa-solid fa-chart-simple me-2"></i>Lihat Paket Retraining
+						<i class="fa-solid fa-chart-simple me-2"></i>Bandingkan Metrik
 					</a>
 				</div>
 			</div>

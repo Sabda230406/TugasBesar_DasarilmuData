@@ -29,6 +29,7 @@ class RetrainingRun extends Model
 		'started_at',
 		'finished_at',
 		'activated_at',
+		'archived_at',
 	];
 
 	protected $casts = [
@@ -39,6 +40,7 @@ class RetrainingRun extends Model
 		'started_at' => 'datetime',
 		'finished_at' => 'datetime',
 		'activated_at' => 'datetime',
+		'archived_at' => 'datetime',
 	];
 
 	public function user(): BelongsTo

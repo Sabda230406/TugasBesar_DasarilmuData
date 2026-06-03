@@ -724,7 +724,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.models*') ? 'active' : '' }}" href="{{ route('admin.models') }}">
-                            <i class="fa-solid fa-layer-group me-1"></i> Paket Model
+                            <i class="fa-solid fa-brain me-1"></i> Models
                         </a>
                     </li>
                 </ul>

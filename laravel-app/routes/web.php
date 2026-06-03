@@ -39,6 +39,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/history/export', [AdminController::class, 'exportHistory'])->name('admin.history.export');
         Route::get('/admin/models', [AdminController::class, 'models'])->name('admin.models');
         Route::post('/admin/models/runs/{run}/activate', [AdminController::class, 'activateRetrainingRun'])->name('admin.models.runs.activate');
+        Route::post('/admin/models/runs/{run}/archive', [AdminController::class, 'archiveRetrainingRun'])->name('admin.models.runs.archive');
+        Route::post('/admin/models/runs/archive-inactive', [AdminController::class, 'archiveInactiveRetrainingRuns'])->name('admin.models.runs.archive-inactive');
 
         Route::get('/retraining', fn () => redirect()->route('admin.retraining'))->name('retraining');
         Route::post('/retraining/upload', [RetrainingController::class, 'upload'])->name('retraining.upload');

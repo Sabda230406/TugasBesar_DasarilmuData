@@ -283,7 +283,7 @@
 			</div>
 			<div class="d-flex flex-wrap gap-2">
 				<a href="{{ route('admin.models') }}" class="btn btn-outline-dark">
-					<i class="fa-solid fa-layer-group me-2"></i>Lihat Paket Model
+					<i class="fa-solid fa-brain me-2"></i>Lihat Model
 				</a>
 				<button class="btn btn-dark" type="submit" form="retrainingStartForm" @disabled(! $canStartRetraining)>
 					<i class="fa-solid fa-play me-2"></i>Mulai Retraining

@@ -198,13 +198,6 @@ class RunRetrainingJob implements ShouldQueue
 				'is_default' => false,
 				'updated_at' => now(),
 			]);
-			ModelVersion::where('status', ModelVersion::STATUS_ACTIVE)
-				->orWhere('is_active', true)
-				->update([
-					'status' => ModelVersion::STATUS_AVAILABLE,
-					'is_active' => false,
-					'updated_at' => now(),
-				]);
 		}
 
 		foreach (($result['models'] ?? []) as $modelKey => $modelResult) {
@@ -214,6 +207,16 @@ class RunRetrainingJob implements ShouldQueue
 			$isActive = $activated && (bool) ($eligibility['accepted'] ?? false);
 			$isDefault = $isActive && $modelKey === $defaultModelKey;
 			$versionUid = $version['version_id'] ?? ($modelKey . '-' . now()->format('YmdHis') . '-' . Str::random(6));
+
+			if ($isActive) {
+				ModelVersion::where('model_key', $modelKey)
+					->where('status', ModelVersion::STATUS_ACTIVE)
+					->update([
+						'status' => ModelVersion::STATUS_AVAILABLE,
+						'is_active' => false,
+						'updated_at' => now(),
+					]);
+			}
 
 			ModelVersion::updateOrCreate(
 				['version_uid' => $versionUid],

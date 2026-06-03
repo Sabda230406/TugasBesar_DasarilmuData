@@ -1,0 +1,70 @@
+{
+    "model_name": "KNN",
+    "model_key": "knn",
+    "feature_columns": [
+        "gender",
+        "age",
+        "hypertension",
+        "heart_disease",
+        "ever_married",
+        "work_type",
+        "Residence_type",
+        "avg_glucose_level",
+        "bmi",
+        "smoking_status"
+    ],
+    "accuracy": 0.7771822358346095,
+    "classification_report": {
+        "0": {
+            "precision": 0.9616519174041298,
+            "recall": 0.7951219512195122,
+            "f1-score": 0.8704939919893191,
+            "support": 1230.0
+        },
+        "1": {
+            "precision": 0.12802768166089964,
+            "recall": 0.4868421052631579,
+            "f1-score": 0.20273972602739726,
+            "support": 76.0
+        },
+        "accuracy": 0.7771822358346095,
+        "macro avg": {
+            "precision": 0.5448397995325147,
+            "recall": 0.6409820282413351,
+            "f1-score": 0.5366168590083582,
+            "support": 1306.0
+        },
+        "weighted avg": {
+            "precision": 0.9131408592751209,
+            "recall": 0.7771822358346095,
+            "f1-score": 0.8316353976454399,
+            "support": 1306.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            978,
+            252
+        ],
+        [
+            39,
+            37
+        ]
+    ],
+    "best_params": {
+        "model__metric": "euclidean",
+        "model__n_neighbors": 11,
+        "model__weights": "distance"
+    },
+    "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
+    "scoring": "f1",
+    "random_state": 42,
+    "retrained_at": "20260601-213444",
+    "trained_by": "Sabda Putra Aribawa",
+    "uploaded_rows": 137,
+    "combined_rows": 5221,
+    "training_rows": 3915,
+    "test_rows": 1306,
+    "stroke_0_count": 4916,
+    "stroke_1_count": 305
+}

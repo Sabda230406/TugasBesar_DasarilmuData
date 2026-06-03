@@ -343,6 +343,7 @@ class AdminController extends Controller
     public function models(): View
     {
         $this->syncLegacyModelVersions();
+        $this->ensureActiveRetrainingRun();
 
         $runs = RetrainingRun::query()
             ->with([
@@ -350,10 +351,11 @@ class AdminController extends Controller
                 'modelVersions' => fn ($query) => $query->orderBy('model_key'),
             ])
             ->where('status', RetrainingRun::STATUS_COMPLETED)
+            ->whereNull('archived_at')
             ->whereHas('modelVersions')
-            ->latest('is_active')
-            ->latest('activated_at')
-            ->latest('finished_at')
+            ->orderByDesc('is_active')
+            ->orderByDesc('activated_at')
+            ->orderByDesc('finished_at')
             ->latest()
             ->get();
 
@@ -365,8 +367,8 @@ class AdminController extends Controller
 
     public function activateRetrainingRun(RetrainingRun $run): RedirectResponse
     {
-        if ($run->status !== RetrainingRun::STATUS_COMPLETED) {
-            return back()->withErrors(['model' => 'Hanya retraining yang sudah completed yang bisa dijadikan aktif.']);
+        if ($run->status !== RetrainingRun::STATUS_COMPLETED || $run->archived_at) {
+            return back()->withErrors(['model' => 'Hanya retrain model yang completed dan belum dihapus yang bisa digunakan.']);
         }
 
         $versions = $run->modelVersions()
@@ -375,12 +377,12 @@ class AdminController extends Controller
             ->get();
 
         if ($versions->isEmpty()) {
-            return back()->withErrors(['model' => 'Retraining ini tidak punya model yang lolos evaluasi untuk diaktifkan.']);
+            return back()->withErrors(['model' => 'Retrain ini tidak punya model yang lolos evaluasi untuk digunakan.']);
         }
 
         foreach ($versions as $version) {
             if (! $version->artifact_model_path || ! is_file($version->artifact_model_path)) {
-                return back()->withErrors(['model' => "Artefak {$version->model_name} pada retraining #{$run->id} tidak ditemukan."]);
+                return back()->withErrors(['model' => "Artefak {$version->model_name} pada {$this->runVersionLabel($run)} tidak ditemukan."]);
             }
 
             $response = Http::timeout(60)->post('http://127.0.0.1:5001/models/activate', [
@@ -389,7 +391,7 @@ class AdminController extends Controller
             ]);
 
             if (! $response->ok()) {
-                return back()->withErrors(['model' => "ML API gagal mengaktifkan {$version->model_name}: " . $response->body()]);
+                return back()->withErrors(['model' => "ML API gagal menggunakan {$version->model_name}: " . $response->body()]);
             }
         }
 
@@ -406,8 +408,10 @@ class AdminController extends Controller
             'is_default' => false,
             'updated_at' => now(),
         ]);
-        ModelVersion::where('status', ModelVersion::STATUS_ACTIVE)
-            ->orWhere('is_active', true)
+        ModelVersion::where(function ($query) {
+                $query->where('status', ModelVersion::STATUS_ACTIVE)
+                    ->orWhere('is_active', true);
+            })
             ->update([
                 'status' => ModelVersion::STATUS_AVAILABLE,
                 'is_active' => false,
@@ -424,7 +428,39 @@ class AdminController extends Controller
             ]);
         }
 
-        return back()->with('success', "Retraining #{$run->id} sekarang aktif. Prediksi memakai paket model dari retraining ini.");
+        return back()->with('success', $this->runVersionLabel($run) . ' sekarang sedang digunakan untuk prediksi.');
+    }
+
+    public function archiveRetrainingRun(RetrainingRun $run): RedirectResponse
+    {
+        if ($run->stage === 'legacy_baseline') {
+            return back()->withErrors(['model' => 'Baseline model awal tidak bisa dihapus.']);
+        }
+
+        if ($run->is_active) {
+            return back()->withErrors(['model' => 'Retrain model yang sedang digunakan tidak bisa dihapus. Gunakan retrain lain dulu.']);
+        }
+
+        $run->update([
+            'archived_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('success', $this->runVersionLabel($run) . ' berhasil dihapus dari daftar aktif. Data tetap tersimpan sebagai arsip.');
+    }
+
+    public function archiveInactiveRetrainingRuns(): RedirectResponse
+    {
+        $count = RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)
+            ->where('is_active', false)
+            ->where('stage', '!=', 'legacy_baseline')
+            ->whereNull('archived_at')
+            ->update([
+                'archived_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('success', "{$count} retrain model tidak aktif berhasil dihapus dari daftar aktif.");
     }
 
     public function exportHistory(): StreamedResponse
@@ -798,6 +834,44 @@ class AdminController extends Controller
                 ]
             );
         }
+    }
+
+    private function ensureActiveRetrainingRun(): void
+    {
+        if (RetrainingRun::where('is_active', true)->exists()) {
+            return;
+        }
+
+        $run = RetrainingRun::whereHas('modelVersions', fn ($query) => $query->where('is_default', true))
+            ->orWhereHas('modelVersions', fn ($query) => $query->where('is_active', true))
+            ->latest('finished_at')
+            ->first();
+
+        if (! $run) {
+            $run = RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)
+                ->whereNull('archived_at')
+                ->whereHas('modelVersions')
+                ->latest('finished_at')
+                ->first();
+        }
+
+        if ($run) {
+            $run->update([
+                'is_active' => true,
+                'activated_at' => $run->activated_at ?? now(),
+            ]);
+        }
+    }
+
+    private function runVersionLabel(RetrainingRun $run): string
+    {
+        if ($run->stage === 'legacy_baseline') {
+            return 'MODEL_BASELINE';
+        }
+
+        $timestamp = optional($run->finished_at ?? $run->created_at)->format('Ymd_His') ?: now()->format('Ymd_His');
+
+        return 'MODEL_' . $timestamp;
     }
 
     private function activeModelArtifactPaths(string $modelKey): ?array
