@@ -202,7 +202,7 @@
 						<th>Baris</th>
 						<th>Model</th>
 						<th>Status</th>
-						<th>Prob. Risiko</th>
+						<th>Prob. Risiko Tinggi</th>
 						<th>Input</th>
 						<th>Catatan</th>
 					</tr>

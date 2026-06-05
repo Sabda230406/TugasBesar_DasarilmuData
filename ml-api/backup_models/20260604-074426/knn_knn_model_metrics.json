@@ -1,0 +1,61 @@
+{
+    "model_name": "KNN",
+    "feature_columns": [
+        "gender",
+        "age",
+        "hypertension",
+        "heart_disease",
+        "ever_married",
+        "work_type",
+        "Residence_type",
+        "avg_glucose_level",
+        "bmi",
+        "smoking_status"
+    ],
+    "accuracy": 0.7676056338028169,
+    "classification_report": {
+        "0": {
+            "precision": 0.9683995922528033,
+            "recall": 0.78125,
+            "f1-score": 0.864815657715066,
+            "support": 1216.0
+        },
+        "1": {
+            "precision": 0.10437710437710437,
+            "recall": 0.5,
+            "f1-score": 0.17270194986072424,
+            "support": 62.0
+        },
+        "accuracy": 0.7676056338028169,
+        "macro avg": {
+            "precision": 0.5363883483149539,
+            "recall": 0.640625,
+            "f1-score": 0.5187588037878951,
+            "support": 1278.0
+        },
+        "weighted avg": {
+            "precision": 0.9264830083339508,
+            "recall": 0.7676056338028169,
+            "f1-score": 0.8312389363637599,
+            "support": 1278.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            950,
+            266
+        ],
+        [
+            31,
+            31
+        ]
+    ],
+    "best_params": {
+        "model__metric": "euclidean",
+        "model__n_neighbors": 11,
+        "model__weights": "distance"
+    },
+    "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
+    "scoring": "f1",
+    "random_state": 42
+}
