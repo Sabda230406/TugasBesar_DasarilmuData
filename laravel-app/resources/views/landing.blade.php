@@ -3,9 +3,6 @@
 @section('content')
     @php
         $modelOptions = $models ?? [];
-        $selectedModelKey = $selectedModelKey ?? array_key_first($modelOptions) ?? 'decision_tree';
-        $selectedModel = $modelOptions[$selectedModelKey] ?? ($modelOptions ? reset($modelOptions) : null);
-        $modelMetrics = $selectedModel['metrics'] ?? $modelMetrics;
         $readyModels = array_filter($modelOptions, fn ($model) => $model['available'] ?? false);
         $readyCount = count($readyModels);
         $totalModelCount = count($modelOptions);
@@ -14,18 +11,35 @@
         if ($totalModelCount > $readyCount) {
             $modelStatusSummary .= ', ' . ($totalModelCount - $readyCount) . ' Belum Aktif';
         }
-        $formatPercent = function ($value) {
-            if (! is_numeric($value)) {
-                return null;
-            }
-
-            $value = (float) $value;
-            if ($value <= 1) {
-                $value *= 100;
-            }
-
-            return number_format($value, 2) . '%';
-        };
+        $modelPlainGuides = [
+            'decision_tree' => [
+                'headline' => 'Seperti daftar pertanyaan berurutan.',
+                'body' => 'Sistem membaca data pasien langkah demi langkah, seperti petugas yang menanyakan beberapa hal penting sebelum memberi gambaran risiko.',
+                'points' => [
+                    'Mencermati faktor seperti usia, kondisi kesehatan, kadar gula, BMI, dan kebiasaan merokok.',
+                    'Setiap jawaban membawa data ke langkah berikutnya sampai pola risikonya terbaca.',
+                    'Hasil akhirnya berupa tanda risiko rendah atau tinggi sebagai screening awal.',
+                ],
+            ],
+            'knn' => [
+                'headline' => 'Seperti mencari pasien yang mirip.',
+                'body' => 'Sistem membandingkan data pasien baru dengan data pasien lain yang sudah pernah dipelajari, lalu melihat kelompok mana yang paling mirip.',
+                'points' => [
+                    'Mencari data lama yang kondisinya paling mendekati data pasien baru.',
+                    'Melihat apakah data yang mirip tersebut lebih banyak berada di kelompok risiko rendah atau tinggi.',
+                    'Memberi hasil berdasarkan pola terbanyak dari data yang paling mirip.',
+                ],
+            ],
+            'svm' => [
+                'headline' => 'Seperti membuat batas aman dan waspada.',
+                'body' => 'Sistem mempelajari pola data untuk membedakan kelompok risiko rendah dan tinggi, lalu menempatkan data pasien baru pada sisi yang paling sesuai.',
+                'points' => [
+                    'Mengenali perbedaan pola antara data yang cenderung aman dan data yang perlu diwaspadai.',
+                    'Mencari batas pemisah yang paling jelas di antara pola-pola tersebut.',
+                    'Menentukan apakah data pasien lebih dekat ke sisi risiko rendah atau risiko tinggi.',
+                ],
+            ],
+        ];
     @endphp
 
     <style>
@@ -168,88 +182,63 @@
             color: #92400e;
         }
 
-        .model-detail-toggle {
-            border-radius: 999px;
-            font-weight: 800;
-            padding: 0.65rem 0.95rem;
+        .model-card {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        .model-detail-modal .modal-content {
-            border-radius: 22px;
-            border: 1px solid rgba(15, 118, 110, 0.18);
-            box-shadow: 0 24px 55px rgba(15, 32, 50, 0.22);
+        .model-card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
         }
 
-        .model-detail-modal .modal-header {
-            border-bottom: 1px solid rgba(15, 118, 110, 0.12);
-            background: linear-gradient(135deg, rgba(240, 253, 250, 0.95), #ffffff);
-            border-top-left-radius: 22px;
-            border-top-right-radius: 22px;
-        }
-
-        .model-detail-modal .modal-title {
-            font-weight: 800;
-            color: #0f172a;
-        }
-
-        .model-detail-modal .modal-body {
-            padding: 1.5rem;
-        }
-
-        .model-detail-modal .modal-footer {
-            border-top: 1px solid rgba(15, 118, 110, 0.12);
-            padding: 1rem 1.5rem 1.25rem;
-        }
-
-        .dt-detail-panel {
+        .model-icon {
+            width: 48px;
+            height: 48px;
             border-radius: 16px;
-            border: 1px solid rgba(15, 118, 110, 0.16);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            background: rgba(15, 118, 110, 0.1);
+            color: #0f766e;
+            font-size: 1.1rem;
+        }
+
+        .model-work-panel {
+            border-radius: 16px;
+            border: 1px solid rgba(15, 118, 110, 0.15);
             background: linear-gradient(135deg, rgba(240, 253, 250, 0.9), #ffffff);
             padding: 1rem;
         }
 
-        .dt-metric-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
+        .model-work-label {
+            color: #0f172a;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
         }
 
-        .dt-simple-note {
-            border-radius: 14px;
-            background: rgba(15, 118, 110, 0.08);
-            border: 1px solid rgba(15, 118, 110, 0.14);
-            padding: 0.85rem;
-            color: #334155;
+        .model-work-list {
+            display: grid;
+            gap: 0.7rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .model-work-list li {
+            display: flex;
+            gap: 0.65rem;
+            color: #475569;
             line-height: 1.6;
         }
 
-        .dt-metric-box {
-            border-radius: 14px;
-            background: #ffffff;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            padding: 0.8rem;
-        }
-
-        .dt-metric-label {
-            color: #64748b;
-            font-size: 0.72rem;
-            font-weight: 800;
-            margin-bottom: 0.25rem;
-        }
-
-        .dt-metric-value {
-            color: #0f172a;
-            font-size: 1.05rem;
-            font-weight: 900;
-            line-height: 1;
-        }
-
-        .dt-metric-value.primary {
+        .model-work-list i {
             color: #0f766e;
-        }
-
-        .modal-backdrop.show {
-            opacity: 0.5;
+            margin-top: 0.25rem;
+            flex: 0 0 auto;
         }
 
         .stroke-visual {
@@ -304,65 +293,6 @@
             z-index: 1;
         }
 
-        .metric-value {
-            font-size: 2.6rem;
-            font-weight: 800;
-            color: #0f172a;
-            line-height: 1;
-        }
-
-        .metric-value.primary {
-            color: #0f766e;
-        }
-
-        .metric-grid {
-            display: grid;
-            gap: 1rem;
-        }
-
-        .metric-explain {
-            border: 1px solid rgba(15, 118, 110, 0.16);
-            border-radius: 20px;
-            padding: 1.4rem;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(240, 253, 250, 0.9), #ffffff);
-            box-shadow: 0 14px 28px rgba(15, 32, 50, 0.06);
-        }
-
-        .metric-label {
-            color: #64748b;
-            font-size: 0.86rem;
-            font-weight: 700;
-            margin-bottom: 0.35rem;
-        }
-
-        .metric-caption {
-            color: #64748b;
-            font-size: 0.9rem;
-            line-height: 1.6;
-            margin-bottom: 0;
-        }
-
-        .explain-list {
-            display: grid;
-            gap: 0.85rem;
-            margin: 0;
-            padding: 0;
-            list-style: none;
-        }
-
-        .explain-list li {
-            display: flex;
-            gap: 0.75rem;
-            color: #475569;
-            line-height: 1.6;
-        }
-
-        .explain-list i {
-            color: #0f766e;
-            margin-top: 0.25rem;
-        }
-
         .dataset-link {
             display: inline-flex;
             align-items: center;
@@ -376,16 +306,52 @@
             color: #155e75;
         }
 
-        .team-avatar {
-            width: 56px;
-            height: 56px;
+        .dt-simple-note {
+            border-radius: 14px;
+            background: rgba(15, 118, 110, 0.08);
+            border: 1px solid rgba(15, 118, 110, 0.14);
+            padding: 0.85rem;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .team-card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .team-photo-frame {
+            position: relative;
+            overflow: hidden;
             border-radius: 18px;
+            aspect-ratio: 4 / 3;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(15, 118, 110, 0.14);
+            background: linear-gradient(135deg, rgba(224, 242, 254, 0.9), rgba(240, 253, 250, 0.95));
+            box-shadow: inset 0 0 0 8px rgba(255, 255, 255, 0.55);
+        }
+
+        .team-photo-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .team-photo-number {
+            position: absolute;
+            left: 0.85rem;
+            bottom: 0.85rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: #e0f2fe;
-            color: #155e75;
-            font-weight: 800;
+            min-width: 42px;
+            height: 34px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.72);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 0.82rem;
+            backdrop-filter: blur(10px);
         }
 
         .step-number {
@@ -481,10 +447,6 @@
             .brain-illustration i {
                 font-size: 6rem;
             }
-
-            .dt-metric-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 
@@ -562,9 +524,9 @@
             </div>
             <div class="col-md-4">
                 <div class="quick-stat">
-                    <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
-                    <h3 class="h6 fw-bold mb-2">Hasil Transparan</h3>
-                    <p class="soft-copy mb-0">Metrik evaluasi ditampilkan agar pengguna tahu seberapa akurat model bekerja.</p>
+                    <div class="icon"><i class="fa-solid fa-comments"></i></div>
+                    <h3 class="h6 fw-bold mb-2">Penjelasan Mudah</h3>
+                    <p class="soft-copy mb-0">Cara kerja tiap model dijelaskan dengan bahasa sederhana agar mudah dipahami pengguna umum.</p>
                 </div>
             </div>
         </section>
@@ -590,99 +552,69 @@
             </div>
         </section>
 
-    <section class="row g-4" id="models">
+        <section id="models">
+            <div class="row align-items-end g-3 mb-4">
+                <div class="col-lg-8">
+                    <p class="section-kicker">Model Prediksi</p>
+                    <h2 class="fw-bold mb-2">Tiga cara sistem membaca data kesehatan.</h2>
+                    <p class="soft-copy mb-0">
+                        Setiap model punya cara pandang berbeda. Penjelasan di bawah dibuat tanpa angka teknis,
+                        supaya fokusnya pada gambaran sederhana tentang bagaimana sistem mengambil keputusan awal.
+                    </p>
+                </div>
+            </div>
+            <div class="row g-4">
             @foreach($modelOptions as $key => $model)
                 @php
                     $isAvailable = $model['available'] ?? false;
-                    $isSelected = $selectedModelKey === $key && $isAvailable;
                     $modelLabel = $model['name'] ?? $model['label'];
-                    $modelCardMetrics = $model['metrics'] ?? [];
-                    $modelStrokeMetrics = $modelCardMetrics['classification_report']['1'] ?? [];
-                    $modelConfusionMatrix = $modelCardMetrics['confusion_matrix'] ?? [];
-                    $modelAccuracyDisplay = $modelCardMetrics['accuracy_display'] ?? ($formatPercent($modelCardMetrics['accuracy'] ?? null) ?? 'Belum tersedia');
-                    $modelRecallDisplay = $formatPercent($modelStrokeMetrics['recall'] ?? null) ?? 'Belum tersedia';
-                    $modelF1Display = $formatPercent($modelStrokeMetrics['f1-score'] ?? null) ?? 'Belum tersedia';
-                    $modelFalseNegative = $modelConfusionMatrix[1][0] ?? null;
-                    $modelTruePositive = $modelConfusionMatrix[1][1] ?? null;
-                    $modalId = 'modelDetailModal' . str_replace('_', '', $key);
+                    $modelGuide = $modelPlainGuides[$key] ?? [
+                        'headline' => 'Seperti membaca pola dari data lama.',
+                        'body' => 'Sistem mempelajari contoh data sebelumnya, lalu memakai pola tersebut untuk memberi gambaran risiko pada data baru.',
+                        'points' => [
+                            'Membaca data kesehatan yang dimasukkan pengguna.',
+                            'Membandingkannya dengan pola dari data yang sudah dipelajari.',
+                            'Memberi hasil risiko rendah atau tinggi sebagai panduan awal.',
+                        ],
+                    ];
                 @endphp
                 <div class="col-md-4">
                     <div class="model-card">
-                        <p class="section-kicker">{{ $isAvailable ? 'Model Siap' : 'Model Tambahan' }}</p>
-                        <h3 class="h5 fw-bold mb-2">{{ $modelLabel }} Classifier</h3>
+                        <div class="model-card-header">
+                            <span class="model-icon">
+                                <i class="fa-solid {{ $model['icon'] ?? 'fa-brain' }}"></i>
+                            </span>
+                            <div>
+                                <p class="section-kicker mb-1">{{ $isAvailable ? 'Model Siap' : 'Model Tambahan' }}</p>
+                                <h3 class="h5 fw-bold mb-0">{{ $modelLabel }}</h3>
+                            </div>
+                        </div>
                         <span class="model-status {{ $isAvailable ? 'active' : 'pending' }} mb-3">
                             <i class="fa-solid {{ $isAvailable ? 'fa-circle-check' : 'fa-clock' }}"></i>{{ $model['status_label'] ?? '-' }}
                         </span>
                         @if($isAvailable)
-                            <p class="soft-copy mb-3">
-                                Model ini tersambung ke Flask ML API dan bisa dipakai untuk prediksi satu pasien maupun banyak data sekaligus.
+                            <p class="soft-copy mb-0">
+                                Model ini membantu membaca data pasien lalu memberi gambaran awal apakah kondisinya lebih dekat ke risiko rendah atau risiko tinggi.
                             </p>
-                            <button class="btn btn-outline-dark model-detail-toggle w-100" type="button" data-bs-toggle="modal" data-bs-target="#{{ $modalId }}">
-                                <i class="fa-solid fa-circle-info me-1"></i>
-                                Cara membaca hasil model
-                            </button>
-                            <div class="modal fade model-detail-modal" id="{{ $modalId }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-lg modal-dialog-centered">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title"><i class="fa-solid fa-circle-info me-2"></i>Cara membaca hasil {{ $modelLabel }}</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <div class="dt-detail-panel">
-                                                <p class="fw-bold mb-2">Hasil ini adalah screening awal.</p>
-                                                <p class="soft-copy small mb-3">
-                                                    Prediksi membantu memberi gambaran risiko dari data yang diinput. Hasil risiko tinggi
-                                                    bukan berarti pasti stroke, dan hasil risiko rendah bukan berarti bebas risiko selamanya.
-                                                </p>
-
-                                                <div class="dt-simple-note small mb-3">
-                                                    Model dibuat lebih berhati-hati terhadap kemungkinan risiko tinggi. Jadi, sebagian hasil
-                                                    bisa muncul sebagai peringatan agar pengguna mempertimbangkan pemeriksaan lanjutan.
-                                                </div>
-
-                                                <p class="fw-bold small mb-2">Detail evaluasi {{ $modelLabel }}</p>
-                                                <div class="dt-metric-grid mb-3">
-                                                    <div class="dt-metric-box">
-                                                        <p class="dt-metric-label">Deteksi Risiko Tinggi</p>
-                                                        <div class="dt-metric-value primary">{{ $modelRecallDisplay }}</div>
-                                                    </div>
-                                                    <div class="dt-metric-box">
-                                                        <p class="dt-metric-label">Keseimbangan Model</p>
-                                                        <div class="dt-metric-value">{{ $modelF1Display }}</div>
-                                                    </div>
-                                                    <div class="dt-metric-box">
-                                                        <p class="dt-metric-label">Accuracy Evaluasi</p>
-                                                        <div class="dt-metric-value">{{ $modelAccuracyDisplay }}</div>
-                                                    </div>
-                                                </div>
-
-                                                <ul class="explain-list small">
-                                                    <li>
-                                                        <i class="fa-solid fa-shield-heart"></i>
-                                                        <span>Jika hasilnya risiko tinggi, sebaiknya lakukan pengecekan lanjutan atau konsultasi tenaga medis.</span>
-                                                    </li>
-                                                    @if(is_numeric($modelFalseNegative) && is_numeric($modelTruePositive))
-                                                        <li>
-                                                            <i class="fa-solid fa-chart-simple"></i>
-                                                            <span>Pada data uji, {{ $modelLabel }} mendeteksi {{ $modelTruePositive }} data risiko tinggi dan melewatkan {{ $modelFalseNegative }} data risiko tinggi.</span>
-                                                        </li>
-                                                    @endif
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="model-work-panel">
+                                <p class="model-work-label">{{ $modelGuide['headline'] }}</p>
+                                <p class="soft-copy small mb-0">{{ $modelGuide['body'] }}</p>
                             </div>
+                            <ul class="model-work-list small">
+                                @foreach($modelGuide['points'] as $point)
+                                    <li>
+                                        <i class="fa-solid fa-circle-check"></i>
+                                        <span>{{ $point }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
                         @else
-                            <p class="soft-copy mb-0">Belum bisa dipakai sampai file model, feature columns, dan metrics tersedia di folder <code>ml-api</code>.</p>
+                            <p class="soft-copy mb-0">Model ini belum aktif, jadi belum dipakai untuk membaca data pasien pada halaman prediksi.</p>
                         @endif
                     </div>
                 </div>
             @endforeach
+            </div>
         </section>
 
         <section class="action-card">
@@ -765,7 +697,7 @@
 
                     <div class="dt-simple-note small mt-3">
                         <strong>Catatan:</strong> Retraining penuh dijalankan saat data pool sudah memenuhi syarat.
-                        Decision Tree, KNN, dan SVM akan dilatih dari basis data yang sama agar evaluasinya lebih adil.
+                        Decision Tree, KNN, dan SVM akan dilatih dari basis data yang sama agar perbandingannya lebih adil.
                     </div>
                 </div>
             </div>
@@ -834,26 +766,35 @@
         </section>
 
         <section>
-            <p class="section-kicker">Our Team</p>
+            <p class="section-kicker">Tim Pengembang</p>
             <h2 class="fw-bold mb-4">Tim Pengembang</h2>
             <div class="row g-4">
                 <div class="col-md-4">
                     <div class="team-card">
-                        <div class="team-avatar mb-3">01</div>
+                        <div class="team-photo-frame">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Ali Nur Hakim" loading="lazy">
+                            <span class="team-photo-number">01</span>
+                        </div>
                         <h3 class="h5 fw-bold mb-1">Ali Nur Hakim</h3>
                         <p class="soft-copy mb-0">Laravel & Integrasi Sistem</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="team-card">
-                        <div class="team-avatar mb-3">02</div>
+                        <div class="team-photo-frame">
+                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Viona Deva Qaulika" loading="lazy">
+                            <span class="team-photo-number">02</span>
+                        </div>
                         <h3 class="h5 fw-bold mb-1">Viona Deva Qaulika</h3>
                         <p class="soft-copy mb-0">Machine Learning & Dataset</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="team-card">
-                        <div class="team-avatar mb-3">03</div>
+                        <div class="team-photo-frame">
+                            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Sabda Putra Aribawa" loading="lazy">
+                            <span class="team-photo-number">03</span>
+                        </div>
                         <h3 class="h5 fw-bold mb-1">Sabda Putra Aribawa</h3>
                         <p class="soft-copy mb-0">UI Design & Dokumentasi</p>
                     </div>

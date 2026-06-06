@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/retraining/datasets/{dataset}/restore', [AdminController::class, 'restoreDataset'])->name('admin.retraining.restore');
         Route::get('/admin/history/export', [AdminController::class, 'exportHistory'])->name('admin.history.export');
         Route::get('/admin/models', [AdminController::class, 'models'])->name('admin.models');
+        Route::post('/admin/models/versions/{version}/activate', [AdminController::class, 'activateModelVersion'])->name('admin.models.versions.activate');
         Route::post('/admin/models/runs/{run}/activate', [AdminController::class, 'activateRetrainingRun'])->name('admin.models.runs.activate');
         Route::post('/admin/models/runs/{run}/archive', [AdminController::class, 'archiveRetrainingRun'])->name('admin.models.runs.archive');
         Route::post('/admin/models/runs/archive-inactive', [AdminController::class, 'archiveInactiveRetrainingRuns'])->name('admin.models.runs.archive-inactive');

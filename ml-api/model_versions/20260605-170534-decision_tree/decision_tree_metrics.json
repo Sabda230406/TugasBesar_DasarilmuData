@@ -1,0 +1,137 @@
+{
+    "model_name": "Decision Tree",
+    "model_key": "decision_tree",
+    "feature_columns": [
+        "gender",
+        "age",
+        "hypertension",
+        "heart_disease",
+        "ever_married",
+        "work_type",
+        "Residence_type",
+        "avg_glucose_level",
+        "bmi",
+        "smoking_status"
+    ],
+    "accuracy": 0.7465753424657534,
+    "classification_report": {
+        "0": {
+            "precision": 0.9798115746971736,
+            "recall": 0.7489711934156379,
+            "f1-score": 0.8489795918367347,
+            "support": 972.0
+        },
+        "1": {
+            "precision": 0.12544802867383512,
+            "recall": 0.7,
+            "f1-score": 0.2127659574468085,
+            "support": 50.0
+        },
+        "accuracy": 0.7465753424657534,
+        "macro avg": {
+            "precision": 0.5526298016855044,
+            "recall": 0.724485596707819,
+            "f1-score": 0.5308727746417716,
+            "support": 1022.0
+        },
+        "weighted avg": {
+            "precision": 0.9380129667703958,
+            "recall": 0.7465753424657534,
+            "f1-score": 0.8178536801738224,
+            "support": 1022.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            728,
+            244
+        ],
+        [
+            15,
+            35
+        ]
+    ],
+    "evaluation_rows": 1022,
+    "evaluation_dataset": "C:\\Users\\Sabduyyy\\TugasBesar_DasarilmuData\\data\\stroke-evaluation-dataset.csv",
+    "scoring": "fixed_evaluation_dataset",
+    "retrained_at": "20260605-170534",
+    "trained_by": "Sabda Putra Aribawa",
+    "uploaded_rows": 100,
+    "combined_rows": 4138,
+    "training_rows": 3103,
+    "test_rows": 1035,
+    "stroke_0_count": 3921,
+    "stroke_1_count": 217,
+    "training_validation_metrics": {
+        "model_name": "Decision Tree",
+        "model_key": "decision_tree",
+        "feature_columns": [
+            "gender",
+            "age",
+            "hypertension",
+            "heart_disease",
+            "ever_married",
+            "work_type",
+            "Residence_type",
+            "avg_glucose_level",
+            "bmi",
+            "smoking_status"
+        ],
+        "accuracy": 0.7391304347826086,
+        "classification_report": {
+            "0": {
+                "precision": 0.984993178717599,
+                "recall": 0.7359836901121305,
+                "f1-score": 0.8424737456242707,
+                "support": 981.0
+            },
+            "1": {
+                "precision": 0.1423841059602649,
+                "recall": 0.7962962962962963,
+                "f1-score": 0.24157303370786518,
+                "support": 54.0
+            },
+            "accuracy": 0.7391304347826086,
+            "macro avg": {
+                "precision": 0.5636886423389319,
+                "recall": 0.7661399932042134,
+                "f1-score": 0.5420233896660679,
+                "support": 1035.0
+            },
+            "weighted avg": {
+                "precision": 0.941030966225912,
+                "recall": 0.7391304347826086,
+                "f1-score": 0.8111224041329799,
+                "support": 1035.0
+            }
+        },
+        "confusion_matrix": [
+            [
+                722,
+                259
+            ],
+            [
+                11,
+                43
+            ]
+        ],
+        "best_params": {
+            "model__class_weight": null,
+            "model__criterion": "gini",
+            "model__max_depth": 5,
+            "model__min_samples_leaf": 4,
+            "model__min_samples_split": 2
+        },
+        "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
+        "scoring": "f1",
+        "random_state": 42,
+        "retrained_at": "20260605-170534",
+        "trained_by": "Sabda Putra Aribawa",
+        "uploaded_rows": 100,
+        "combined_rows": 4138,
+        "training_rows": 3103,
+        "test_rows": 1035,
+        "stroke_0_count": 3921,
+        "stroke_1_count": 217
+    }
+}

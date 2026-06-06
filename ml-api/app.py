@@ -1020,17 +1020,28 @@ def retrain():
 			)
 			for model_key, result in trained_results.items()
 		}
-		activated = all(result["accepted"] for result in eligibility_results.values())
+		activated_model_keys = [
+			model_key
+			for model_key, result in eligibility_results.items()
+			if result["accepted"]
+		]
+		rejected_model_keys = [
+			model_key
+			for model_key in model_keys
+			if model_key not in activated_model_keys
+		]
+		activated = bool(activated_model_keys)
 		backup_dir = None
 		if activated:
-			write_progress(progress_path, "activating_model", 88, "Model lolos evaluasi. Membackup model lama.")
-			backup_dir = backup_existing_models(model_keys, timestamp)
+			write_progress(progress_path, "activating_model", 88, "Model yang lolos evaluasi sedang diaktifkan.")
+			backup_dir = backup_existing_models(activated_model_keys, timestamp)
 
 		response_models = {}
 		for model_key, result in trained_results.items():
 			version_id = f"{timestamp}-{model_key}"
 			version_paths = save_model_version(model_key, result["model"], result["metrics"], version_id)
-			if activated:
+			model_activated = model_key in activated_model_keys
+			if model_activated:
 				activate_model_version(model_key, version_id)
 
 			metrics = to_jsonable(result["metrics"])
@@ -1046,7 +1057,7 @@ def retrain():
 				"previous_metrics": eligibility["previous_metrics"],
 				"version": {
 					"version_id": version_id,
-					"status": "active" if activated and eligibility["accepted"] else ("available" if eligibility["accepted"] else "rejected"),
+					"status": "active" if model_activated else "rejected",
 					"model_path": str(version_paths["model"]),
 					"features_path": str(version_paths["features"]),
 					"metrics_path": str(version_paths["metrics"]),
@@ -1059,9 +1070,11 @@ def retrain():
 			{
 				"status": "success",
 				"activated": activated,
-				"message": "Retraining selesai dan model baru diaktifkan."
+				"activated_models": activated_model_keys,
+				"rejected_models": rejected_model_keys,
+				"message": "Retraining selesai dan model baru yang lolos evaluasi diaktifkan."
 				if activated
-				else "Retraining selesai, tetapi model baru belum diaktifkan karena metrik belum layak.",
+				else "Retraining selesai, tetapi belum ada model baru yang lolos untuk diaktifkan.",
 				"backup_dir": str(backup_dir) if backup_dir else None,
 				"models": response_models,
 			}

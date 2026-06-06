@@ -340,29 +340,131 @@ class AdminController extends Controller
         ]);
     }
 
-    public function models(): View
+    public function models(Request $request): View
     {
         $this->syncLegacyModelVersions();
-        $this->ensureActiveRetrainingRun();
+        $this->ensureActiveModelVersions();
+        $this->refreshRunActivationFlags();
 
-        $runs = RetrainingRun::query()
-            ->with([
-                'user',
-                'modelVersions' => fn ($query) => $query->orderBy('model_key'),
-            ])
-            ->where('status', RetrainingRun::STATUS_COMPLETED)
-            ->whereNull('archived_at')
-            ->whereHas('modelVersions')
+        $modelOptions = collect($this->modelOptions());
+        $requestedModelKey = (string) $request->query('model', 'all');
+        $selectedModelKey = $modelOptions->has($requestedModelKey) ? $requestedModelKey : 'all';
+        $selectedModel = $selectedModelKey === 'all' ? null : $modelOptions->get($selectedModelKey);
+
+        $usageFilters = [
+            'active' => 'Aktif',
+            'inactive' => 'Belum aktif',
+        ];
+        $readinessFilters = [
+            'can_activate' => 'Bisa diaktifkan',
+            'blocked' => 'Perlu dicek',
+        ];
+        $timeFilters = [
+            'today' => 'Hari ini',
+            '7_days' => '7 hari terakhir',
+            '30_days' => '30 hari terakhir',
+        ];
+        $filters = [
+            'usage' => (string) $request->query('usage', ''),
+            'readiness' => (string) $request->query('readiness', ''),
+            'time' => (string) $request->query('time', ''),
+        ];
+
+        if (! array_key_exists($filters['usage'], $usageFilters)) {
+            $filters['usage'] = '';
+        }
+
+        if (! array_key_exists($filters['readiness'], $readinessFilters)) {
+            $filters['readiness'] = '';
+        }
+
+        if (! array_key_exists($filters['time'], $timeFilters)) {
+            $filters['time'] = '';
+        }
+
+        $timeFrom = match ($filters['time']) {
+            'today' => now()->startOfDay(),
+            '7_days' => now()->subDays(7)->startOfDay(),
+            '30_days' => now()->subDays(30)->startOfDay(),
+            default => null,
+        };
+
+        $baseVersionQuery = ModelVersion::query()
+            ->with(['retrainingRun.user'])
+            ->whereHas('retrainingRun', function ($query) {
+                $query->where('status', RetrainingRun::STATUS_COMPLETED)
+                    ->whereNull('archived_at');
+            });
+
+        $activeVersions = (clone $baseVersionQuery)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('model_key');
+
+        $versions = (clone $baseVersionQuery)
+            ->when($selectedModelKey !== 'all', fn ($query) => $query->where('model_key', $selectedModelKey))
+            ->when($filters['usage'] === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($filters['usage'] === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($filters['readiness'] === 'can_activate', function ($query) {
+                $query->where('is_active', false)
+                    ->whereNotNull('artifact_model_path')
+                    ->whereNotNull('artifact_features_path')
+                    ->where('artifact_model_path', '!=', '')
+                    ->where('artifact_features_path', '!=', '');
+            })
+            ->when($filters['readiness'] === 'blocked', function ($query) {
+                $query->where('is_active', false)
+                    ->where(function ($query) {
+                        $query->whereNull('artifact_model_path')
+                            ->orWhereNull('artifact_features_path')
+                            ->orWhere('artifact_model_path', '')
+                            ->orWhere('artifact_features_path', '');
+                    });
+            })
+            ->when($timeFrom, function ($query) use ($timeFrom) {
+                $query->where(function ($query) use ($timeFrom) {
+                    $query->where('retrained_at', '>=', $timeFrom)
+                        ->orWhere(function ($query) use ($timeFrom) {
+                            $query->whereNull('retrained_at')
+                                ->where('created_at', '>=', $timeFrom);
+                        });
+                });
+            })
             ->orderByDesc('is_active')
             ->orderByDesc('activated_at')
-            ->orderByDesc('finished_at')
+            ->orderByDesc('retrained_at')
             ->latest()
-            ->get();
+            ->paginate(8)
+            ->withQueryString()
+            ->fragment('model-list');
 
         return view('admin.models', [
-            'runs' => $runs,
-            'activeRun' => $runs->firstWhere('is_active', true),
+            'modelOptions' => $modelOptions,
+            'selectedModelKey' => $selectedModelKey,
+            'selectedModel' => $selectedModel,
+            'activeVersions' => $activeVersions,
+            'versions' => $versions,
+            'filters' => $filters,
+            'usageFilters' => $usageFilters,
+            'readinessFilters' => $readinessFilters,
+            'timeFilters' => $timeFilters,
         ]);
+    }
+
+    public function activateModelVersion(ModelVersion $version): RedirectResponse
+    {
+        $version->load('retrainingRun');
+
+        if (! $this->modelVersionCanBeActivated($version)) {
+            return back()->withErrors(['model' => "{$version->model_name} tidak bisa diaktifkan. Pastikan artefaknya masih ada dan run belum diarsipkan."]);
+        }
+
+        $error = $this->activateModelVersionRecord($version);
+        if ($error) {
+            return back()->withErrors(['model' => $error]);
+        }
+
+        return back()->with('success', "{$version->model_name} versi {$version->version_uid} sekarang aktif.");
     }
 
     public function activateRetrainingRun(RetrainingRun $run): RedirectResponse
@@ -372,60 +474,18 @@ class AdminController extends Controller
         }
 
         $versions = $run->modelVersions()
-            ->where('status', '!=', ModelVersion::STATUS_REJECTED)
             ->orderBy('model_key')
             ->get();
 
         if ($versions->isEmpty()) {
-            return back()->withErrors(['model' => 'Retrain ini tidak punya model yang lolos evaluasi untuk digunakan.']);
+            return back()->withErrors(['model' => 'Retrain ini tidak punya versi model untuk digunakan.']);
         }
 
         foreach ($versions as $version) {
-            if (! $version->artifact_model_path || ! is_file($version->artifact_model_path)) {
-                return back()->withErrors(['model' => "Artefak {$version->model_name} pada {$this->runVersionLabel($run)} tidak ditemukan."]);
+            $error = $this->activateModelVersionRecord($version);
+            if ($error) {
+                return back()->withErrors(['model' => $error]);
             }
-
-            $response = Http::timeout(60)->post('http://127.0.0.1:5001/models/activate', [
-                'model_key' => $version->model_key,
-                'version_id' => $version->version_uid,
-            ]);
-
-            if (! $response->ok()) {
-                return back()->withErrors(['model' => "ML API gagal menggunakan {$version->model_name}: " . $response->body()]);
-            }
-        }
-
-        RetrainingRun::query()->update([
-            'is_active' => false,
-            'updated_at' => now(),
-        ]);
-        $run->update([
-            'is_active' => true,
-            'activated_at' => now(),
-        ]);
-
-        ModelVersion::query()->update([
-            'is_default' => false,
-            'updated_at' => now(),
-        ]);
-        ModelVersion::where(function ($query) {
-                $query->where('status', ModelVersion::STATUS_ACTIVE)
-                    ->orWhere('is_active', true);
-            })
-            ->update([
-                'status' => ModelVersion::STATUS_AVAILABLE,
-                'is_active' => false,
-                'updated_at' => now(),
-            ]);
-
-        $defaultModelKey = $run->selected_model_keys[0] ?? $versions->first()->model_key;
-        foreach ($versions as $version) {
-            $version->update([
-                'status' => ModelVersion::STATUS_ACTIVE,
-                'is_active' => true,
-                'is_default' => $version->model_key === $defaultModelKey,
-                'activated_at' => now(),
-            ]);
         }
 
         return back()->with('success', $this->runVersionLabel($run) . ' sekarang sedang digunakan untuk prediksi.');
@@ -437,7 +497,7 @@ class AdminController extends Controller
             return back()->withErrors(['model' => 'Baseline model awal tidak bisa dihapus.']);
         }
 
-        if ($run->is_active) {
+        if ($run->modelVersions()->where('is_active', true)->exists()) {
             return back()->withErrors(['model' => 'Retrain model yang sedang digunakan tidak bisa dihapus. Gunakan retrain lain dulu.']);
         }
 
@@ -452,7 +512,7 @@ class AdminController extends Controller
     public function archiveInactiveRetrainingRuns(): RedirectResponse
     {
         $count = RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)
-            ->where('is_active', false)
+            ->whereDoesntHave('modelVersions', fn ($query) => $query->where('is_active', true))
             ->where('stage', '!=', 'legacy_baseline')
             ->whereNull('archived_at')
             ->update([
@@ -461,6 +521,75 @@ class AdminController extends Controller
             ]);
 
         return back()->with('success', "{$count} retrain model tidak aktif berhasil dihapus dari daftar aktif.");
+    }
+
+    private function modelVersionCanBeActivated(ModelVersion $version): bool
+    {
+        if (! $version->artifact_model_path || ! is_file($version->artifact_model_path)) {
+            return false;
+        }
+
+        if (! $version->artifact_features_path || ! is_file($version->artifact_features_path)) {
+            return false;
+        }
+
+        $run = $version->retrainingRun;
+        if (! $run) {
+            return true;
+        }
+
+        return $run->status === RetrainingRun::STATUS_COMPLETED && ! $run->archived_at;
+    }
+
+    private function activateModelVersionRecord(ModelVersion $version): ?string
+    {
+        $version->load('retrainingRun');
+
+        if (! $this->modelVersionCanBeActivated($version)) {
+            return "{$version->model_name} tidak bisa diaktifkan karena artefaknya tidak valid atau run sudah diarsipkan.";
+        }
+
+        $response = Http::timeout(60)->post('http://127.0.0.1:5001/models/activate', [
+            'model_key' => $version->model_key,
+            'version_id' => $version->version_uid,
+        ]);
+
+        if (! $response->ok()) {
+            return "ML API gagal menggunakan {$version->model_name}: " . $response->body();
+        }
+
+        $wasDefaultForModel = ModelVersion::where('model_key', $version->model_key)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->exists();
+        $otherDefaultExists = ModelVersion::where('model_key', '!=', $version->model_key)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->exists();
+
+        ModelVersion::where('model_key', $version->model_key)
+            ->where('id', '!=', $version->id)
+            ->where(function ($query) {
+                $query->where('status', ModelVersion::STATUS_ACTIVE)
+                    ->orWhere('is_active', true);
+            })
+            ->update([
+                'status' => ModelVersion::STATUS_AVAILABLE,
+                'is_active' => false,
+                'is_default' => false,
+                'updated_at' => now(),
+            ]);
+
+        $version->update([
+            'status' => ModelVersion::STATUS_ACTIVE,
+            'is_active' => true,
+            'is_default' => $wasDefaultForModel || ! $otherDefaultExists,
+            'activated_at' => now(),
+        ]);
+
+        $this->refreshRunActivationFlags();
+
+        return null;
     }
 
     public function exportHistory(): StreamedResponse
@@ -755,28 +884,19 @@ class AdminController extends Controller
             return;
         }
 
-        $hasActiveRun = RetrainingRun::where('is_active', true)->exists();
         $legacyRun = RetrainingRun::firstOrCreate(
             ['stage' => 'legacy_baseline'],
             [
                 'status' => RetrainingRun::STATUS_COMPLETED,
-                'is_active' => ! $hasActiveRun,
+                'is_active' => false,
                 'progress' => 100,
                 'message' => 'Baseline model sebelum retraining.',
                 'selected_dataset_ids' => [],
                 'selected_model_keys' => $availableModelKeys,
                 'finished_at' => now(),
-                'activated_at' => ! $hasActiveRun ? now() : null,
             ]
         );
-
-        if (! $hasActiveRun && ! $legacyRun->is_active) {
-            $legacyRun->update([
-                'is_active' => true,
-                'activated_at' => now(),
-            ]);
-            $legacyRun->refresh();
-        }
+        $legacyRun->update(['selected_model_keys' => $availableModelKeys]);
 
         foreach ($models as $modelKey => $model) {
             if (! $model['available']) {
@@ -816,51 +936,73 @@ class AdminController extends Controller
                 continue;
             }
 
+            $versionUid = 'legacy-' . $modelKey;
+            $existingLegacy = ModelVersion::where('version_uid', $versionUid)->first();
+            $otherActiveExists = ModelVersion::where('model_key', $modelKey)
+                ->where('version_uid', '!=', $versionUid)
+                ->where('is_active', true)
+                ->exists();
+            $shouldBeActive = ! $otherActiveExists;
+            $defaultExists = ModelVersion::where('is_default', true)
+                ->where('is_active', true)
+                ->exists();
+
             ModelVersion::updateOrCreate(
-                ['version_uid' => 'legacy-' . $modelKey],
+                ['version_uid' => $versionUid],
                 [
                     'model_key' => $modelKey,
                     'model_name' => $metrics['model_name'] ?? $model['name'],
-                    'status' => $legacyRun->is_active ? ModelVersion::STATUS_ACTIVE : ModelVersion::STATUS_AVAILABLE,
-                    'is_active' => $legacyRun->is_active,
-                    'is_default' => $legacyRun->is_active && $modelKey === $this->defaultModelKey(),
+                    'status' => $shouldBeActive ? ModelVersion::STATUS_ACTIVE : ModelVersion::STATUS_AVAILABLE,
+                    'is_active' => $shouldBeActive,
+                    'is_default' => $shouldBeActive && ($existingLegacy?->is_default || ! $defaultExists),
                     'metrics' => $metrics,
                     'evaluation_metrics' => $metrics,
                     'artifact_model_path' => $versionPaths['model'],
                     'artifact_features_path' => $versionPaths['features'],
                     'artifact_metrics_path' => is_file($versionPaths['metrics']) ? $versionPaths['metrics'] : null,
                     'retraining_run_id' => $legacyRun->id,
-                    'activated_at' => $legacyRun->is_active ? ($legacyRun->activated_at ?? now()) : null,
+                    'activated_at' => $shouldBeActive ? ($existingLegacy?->activated_at ?? now()) : null,
                 ]
             );
         }
     }
 
-    private function ensureActiveRetrainingRun(): void
+    private function ensureActiveModelVersions(): void
     {
-        if (RetrainingRun::where('is_active', true)->exists()) {
+        if (! ModelVersion::where('is_default', true)->where('is_active', true)->exists()) {
+            $default = ModelVersion::where('is_active', true)
+                ->orderBy('model_key')
+                ->first();
+
+            if ($default) {
+                $default->update(['is_default' => true]);
+            }
+        }
+    }
+
+    private function refreshRunActivationFlags(): void
+    {
+        $activeRunIds = ModelVersion::where('is_active', true)
+            ->whereNotNull('retraining_run_id')
+            ->pluck('retraining_run_id')
+            ->unique()
+            ->values();
+
+        RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+
+        if ($activeRunIds->isEmpty()) {
             return;
         }
 
-        $run = RetrainingRun::whereHas('modelVersions', fn ($query) => $query->where('is_default', true))
-            ->orWhereHas('modelVersions', fn ($query) => $query->where('is_active', true))
-            ->latest('finished_at')
-            ->first();
-
-        if (! $run) {
-            $run = RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)
-                ->whereNull('archived_at')
-                ->whereHas('modelVersions')
-                ->latest('finished_at')
-                ->first();
-        }
-
-        if ($run) {
+        RetrainingRun::whereIn('id', $activeRunIds)->get()->each(function (RetrainingRun $run) {
             $run->update([
                 'is_active' => true,
                 'activated_at' => $run->activated_at ?? now(),
             ]);
-        }
+        });
     }
 
     private function runVersionLabel(RetrainingRun $run): string
@@ -995,7 +1137,9 @@ class AdminController extends Controller
     private function defaultModelKey(): string
     {
         if (Schema::hasTable('model_versions')) {
-            $defaultVersion = ModelVersion::where('is_default', true)->first();
+            $defaultVersion = ModelVersion::where('is_default', true)
+                ->where('is_active', true)
+                ->first();
             if ($defaultVersion) {
                 return $defaultVersion->model_key;
             }

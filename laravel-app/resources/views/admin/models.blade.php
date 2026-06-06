@@ -2,14 +2,6 @@
 
 @section('content')
 	@php
-		$versionLabel = function ($run) {
-			if ($run->stage === 'legacy_baseline') {
-				return 'MODEL_BASELINE';
-			}
-
-			return 'MODEL_' . optional($run->finished_at ?? $run->created_at)->format('Ymd_His');
-		};
-
 		$statusTone = function ($status) {
 			return match ($status) {
 				'active' => 'success',
@@ -55,19 +47,6 @@
 			return number_format($value, 2) . '%';
 		};
 
-		$averageAccuracy = function ($run) use ($metricValue) {
-			$values = $run->modelVersions
-				->map(fn ($version) => $metricValue($version, 'accuracy'))
-				->filter(fn ($value) => is_numeric($value))
-				->map(fn ($value) => (float) $value <= 1 ? (float) $value * 100 : (float) $value);
-
-			if ($values->isEmpty()) {
-				return null;
-			}
-
-			return $values->avg();
-		};
-
 		$falseNegative = function ($version) {
 			$metrics = $version->evaluation_metrics ?: ($version->metrics ?: []);
 			if (isset($metrics['false_negative'])) {
@@ -81,17 +60,183 @@
 
 			return '-';
 		};
+
+		$versionLabel = function ($version) {
+			$run = $version->retrainingRun;
+			if (($run?->stage === 'legacy_baseline') || str_starts_with($version->version_uid, 'legacy-')) {
+				return 'MODEL_BASELINE';
+			}
+
+			$timestamp = optional($version->retrained_at ?? $run?->finished_at ?? $version->created_at)->format('Ymd_His');
+
+			return 'MODEL_' . ($timestamp ?: $version->id);
+		};
+
+		$runLabel = function ($version) {
+			$run = $version->retrainingRun;
+			if (! $run) {
+				return 'Tanpa run';
+			}
+
+			return $run->stage === 'legacy_baseline' ? 'Baseline awal' : 'Retraining #' . $run->id;
+		};
+
+		$artifactMissing = function ($version) {
+			return ! $version->artifact_model_path
+				|| ! is_file($version->artifact_model_path)
+				|| ! $version->artifact_features_path
+				|| ! is_file($version->artifact_features_path);
+		};
+
+		$isAllModels = $selectedModelKey === 'all';
+		$selectedModelName = $isAllModels ? 'Semua Model' : ($selectedModel['name'] ?? 'Model');
+		$selectedModelIcon = $isAllModels ? 'fa-layer-group' : ($selectedModel['icon'] ?? 'fa-brain');
+		$selectedActiveVersion = $isAllModels ? null : ($activeVersions[$selectedModelKey] ?? null);
+		$activeModelCount = $activeVersions->count();
+		$activeFilterQuery = array_filter($filters, fn ($value) => filled($value));
+		$hasModelFilters = count($activeFilterQuery) > 0;
 	@endphp
+
+	<style>
+		.model-switcher {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 0.75rem;
+		}
+
+		.model-switch {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			min-height: 72px;
+			border: 1px solid var(--admin-line);
+			border-radius: 8px;
+			background: #fff;
+			color: var(--admin-text);
+			text-decoration: none;
+			padding: 0.85rem;
+			transition: 0.16s ease;
+		}
+
+		.model-switch:hover,
+		.model-switch.is-active {
+			border-color: rgba(15, 143, 114, 0.38);
+			background: #f0fbf7;
+			color: var(--admin-brand-deep);
+		}
+
+		.model-switch-icon {
+			width: 42px;
+			height: 42px;
+			border-radius: 8px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: var(--admin-brand-soft);
+			color: var(--admin-brand-deep);
+			flex: 0 0 auto;
+		}
+
+		.model-list-card {
+			border: 1px solid var(--admin-line);
+			border-radius: 8px;
+			background: #fff;
+			box-shadow: var(--shadow-sm);
+			overflow: hidden;
+		}
+
+		.model-list-head {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 1rem;
+			padding: 1rem;
+			background: linear-gradient(135deg, #fbfefd, #f0fbf7);
+			border-bottom: 1px solid var(--admin-line);
+		}
+
+		.model-list-title {
+			display: flex;
+			align-items: center;
+			gap: 0.8rem;
+		}
+
+		.model-list-body {
+			padding: 0.4rem 1rem 1rem;
+		}
+
+		.activate-check {
+			width: 1.25rem;
+			height: 1.25rem;
+			cursor: pointer;
+		}
+
+		.activate-check:disabled {
+			cursor: not-allowed;
+		}
+
+		.model-active-cell {
+			width: 58px;
+			text-align: center;
+		}
+
+		.version-note {
+			max-width: 380px;
+		}
+
+		.score-cell {
+			min-width: 96px;
+			font-weight: 800;
+			color: var(--admin-text);
+			white-space: nowrap;
+		}
+
+		.model-pagination {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.75rem;
+			padding-top: 0.85rem;
+			border-top: 1px solid var(--admin-line);
+		}
+
+		.model-pagination .pagination {
+			margin-bottom: 0;
+		}
+
+		.model-pagination-summary {
+			color: var(--admin-muted);
+			font-size: 0.82rem;
+			font-weight: 700;
+		}
+
+		@media (max-width: 991.98px) {
+			.model-switcher {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		@media (max-width: 767.98px) {
+			.model-list-head {
+				display: grid;
+			}
+
+			.score-cell {
+				min-width: 0;
+			}
+		}
+	</style>
 
 	<div class="admin-page-stack">
 		<div class="admin-panel">
 			<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
 				<div class="d-flex gap-3 align-items-start">
-					<span class="stat-icon"><i class="fa-solid fa-folder-tree"></i></span>
+					<span class="stat-icon"><i class="fa-solid fa-brain"></i></span>
 					<div>
-						<p class="eyebrow mb-2">Retrain Model</p>
-						<h1 class="h4 fw-bold mb-1">Daftar versi retraining</h1>
-						<p class="section-subtitle mb-0">Pilih hasil retraining yang ingin digunakan, lalu cek metrik model di detailnya.</p>
+						<p class="eyebrow mb-2">Model Aktif</p>
+						<h1 class="h4 fw-bold mb-1">Manajemen versi model</h1>
+						<p class="section-subtitle mb-0">Pilih satu model untuk melihat dan mengaktifkan versi yang dibutuhkan.</p>
 					</div>
 				</div>
 				<a href="{{ route('admin.dashboard') }}" class="btn btn-outline-dark">
@@ -113,153 +258,238 @@
 				</div>
 			@endif
 
-			<div class="d-flex flex-wrap gap-2 mb-3">
+			<div class="d-flex flex-wrap gap-2">
 				<a href="{{ route('admin.retraining') }}#dataset-selection" class="btn btn-dark">
 					<i class="fa-solid fa-rotate me-2"></i>Retrain Manual
 				</a>
 				<form action="{{ route('admin.models.runs.archive-inactive') }}" method="POST" onsubmit="return confirm('Hapus semua retrain model yang tidak sedang digunakan dari daftar aktif?')">
 					@csrf
 					<button class="btn btn-outline-danger" type="submit">
-						<i class="fa-solid fa-trash-can me-2"></i>Hapus Semua Retrain Model
+						<i class="fa-solid fa-trash-can me-2"></i>Hapus Retrain Tidak Aktif
 					</button>
 				</form>
 				<a href="{{ route('admin.retraining') }}" class="btn btn-outline-dark">
 					<i class="fa-solid fa-list-check me-2"></i>Lihat Job Retrain
 				</a>
 			</div>
+		</div>
 
-			<div class="filter-card d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-				<div>
-					<span class="text-muted small fw-bold">Model aktif saat ini:</span>
-					<strong class="text-success">{{ $activeRun ? $versionLabel($activeRun) : 'Belum ada model aktif' }}</strong>
-				</div>
-				<span class="status-chip status-success">
-					<i class="fa-solid fa-circle-check"></i>{{ $activeRun ? 'Sedang digunakan' : 'Fallback sistem' }}
+		<div class="model-switcher" aria-label="Pilih model">
+			<a class="model-switch {{ $isAllModels ? 'is-active' : '' }}" href="{{ route('admin.models', array_merge(['model' => 'all'], $activeFilterQuery)) }}">
+				<span class="model-switch-icon"><i class="fa-solid fa-layer-group"></i></span>
+				<span class="flex-grow-1">
+					<span class="table-title d-block">Semua Model</span>
+					<span class="muted-line">{{ $activeModelCount }} model aktif</span>
 				</span>
+				<span class="status-chip status-primary">Gabungan</span>
+			</a>
+			@foreach($modelOptions as $modelKey => $model)
+				@php
+					$activeVersion = $activeVersions[$modelKey] ?? null;
+					$isSelected = $selectedModelKey === $modelKey;
+				@endphp
+				<a class="model-switch {{ $isSelected ? 'is-active' : '' }}" href="{{ route('admin.models', array_merge(['model' => $modelKey], $activeFilterQuery)) }}">
+					<span class="model-switch-icon"><i class="fa-solid {{ $model['icon'] }}"></i></span>
+					<span class="flex-grow-1">
+						<span class="table-title d-block">{{ $model['name'] }}</span>
+						<span class="muted-line">{{ $activeVersion ? $versionLabel($activeVersion) : 'Belum aktif' }}</span>
+					</span>
+					@if($activeVersion)
+						<span class="status-chip status-success">Aktif</span>
+					@else
+						<span class="status-chip status-warning">Kosong</span>
+					@endif
+				</a>
+			@endforeach
+		</div>
+
+		<form class="filter-card row g-3 align-items-end" method="GET" action="{{ route('admin.models') }}">
+			<input type="hidden" name="model" value="{{ $selectedModelKey }}">
+			<div class="col-lg-3 col-md-6">
+				<label class="form-label fw-bold" for="model-usage">Penggunaan</label>
+				<select id="model-usage" class="form-select" name="usage">
+					<option value="">Semua</option>
+					@foreach($usageFilters as $usageValue => $usageLabel)
+						<option value="{{ $usageValue }}" @selected($filters['usage'] === $usageValue)>{{ $usageLabel }}</option>
+					@endforeach
+				</select>
+			</div>
+			<div class="col-lg-3 col-md-6">
+				<label class="form-label fw-bold" for="model-readiness">Kelayakan</label>
+				<select id="model-readiness" class="form-select" name="readiness">
+					<option value="">Semua</option>
+					@foreach($readinessFilters as $readinessValue => $readinessLabel)
+						<option value="{{ $readinessValue }}" @selected($filters['readiness'] === $readinessValue)>{{ $readinessLabel }}</option>
+					@endforeach
+				</select>
+			</div>
+			<div class="col-lg-3 col-md-6">
+				<label class="form-label fw-bold" for="model-time">Periode</label>
+				<select id="model-time" class="form-select" name="time">
+					<option value="">Semua waktu</option>
+					@foreach($timeFilters as $timeValue => $timeLabel)
+						<option value="{{ $timeValue }}" @selected($filters['time'] === $timeValue)>{{ $timeLabel }}</option>
+					@endforeach
+				</select>
+			</div>
+			<div class="col-lg-3 col-md-6 d-grid gap-2">
+				<button class="btn btn-dark" type="submit">
+					<i class="fa-solid fa-filter me-2"></i>Filter
+				</button>
+				@if($hasModelFilters)
+					<a class="btn btn-outline-dark" href="{{ route('admin.models', ['model' => $selectedModelKey]) }}">Reset</a>
+				@endif
+			</div>
+		</form>
+
+		<div class="model-list-card" id="model-list">
+			<div class="model-list-head">
+				<div class="model-list-title">
+					<span class="model-switch-icon"><i class="fa-solid {{ $selectedModelIcon }}"></i></span>
+					<div>
+						<p class="eyebrow mb-1">{{ $isAllModels ? 'semua_model' : $selectedModelKey }}</p>
+						<h2 class="h5 fw-bold mb-1">{{ $selectedModelName }}</h2>
+						<p class="section-subtitle mb-0">{{ $versions->total() }} {{ $hasModelFilters ? 'versi sesuai filter' : 'versi tersedia' }}</p>
+					</div>
+				</div>
+				@if($isAllModels)
+					<span class="status-chip status-primary">
+						<i class="fa-solid fa-layer-group"></i>{{ $activeModelCount }} model aktif
+					</span>
+				@elseif($selectedActiveVersion)
+					<span class="status-chip status-success">
+						<i class="fa-solid fa-circle-check"></i>Aktif: {{ $versionLabel($selectedActiveVersion) }}
+					</span>
+				@else
+					<span class="status-chip status-warning">
+						<i class="fa-solid fa-circle-exclamation"></i>Belum aktif
+					</span>
+				@endif
 			</div>
 
-			<div class="table-responsive">
-				<table class="table admin-table responsive-table align-middle">
-					<thead>
-						<tr>
-							<th>Versi Model</th>
-							<th>Rata-rata Akurasi</th>
-							<th>Status</th>
-							<th class="text-end">Aksi</th>
-						</tr>
-					</thead>
-					<tbody>
-						@forelse($runs as $run)
-							@php
-								$label = $versionLabel($run);
-								$avg = $averageAccuracy($run);
-								$acceptedVersions = $run->modelVersions->where('status', '!=', 'rejected');
-								$missingArtifact = $acceptedVersions->contains(fn ($version) => ! $version->artifact_model_path || ! is_file($version->artifact_model_path));
-								$canUse = ! $run->is_active && $acceptedVersions->isNotEmpty() && ! $missingArtifact;
-							@endphp
+			<div class="model-list-body">
+				<div class="table-responsive">
+					<table class="table admin-table responsive-table align-middle mb-0">
+						<thead>
 							<tr>
-								<td data-label="Versi Model">
-									<div class="entity-cell">
-										<span class="entity-avatar">
-											<i class="fa-solid fa-folder"></i>
-										</span>
-										<div>
-											<div class="table-title">{{ $label }}</div>
-											<div class="muted-line">
-												{{ $run->stage === 'legacy_baseline' ? 'Baseline model awal' : 'Retraining #' . $run->id }}
-												@if($run->is_active)
-													<span class="status-chip status-success ms-2">Aktif</span>
-												@endif
+								<th class="text-center">Aktif</th>
+								<th>Model</th>
+								<th>Versi</th>
+								<th>Accuracy</th>
+								<th>Precision</th>
+								<th>Recall</th>
+								<th>F1-score</th>
+								<th>False Negative</th>
+								<th>Status</th>
+								<th>Run</th>
+							</tr>
+						</thead>
+						<tbody>
+							@forelse($versions as $version)
+								@php
+									$missingArtifact = $artifactMissing($version);
+									$canActivate = ! $version->is_active && ! $missingArtifact;
+									$status = $missingArtifact && ! $version->is_active ? 'artifact_missing' : $version->status;
+									$statusClass = $status === 'artifact_missing' ? 'warning' : $statusTone($version->status);
+									$statusLabel = match ($status) {
+										'active' => 'Active',
+										'available' => 'Available',
+										'rejected' => 'Rejected',
+										'artifact_missing' => 'Artefak hilang',
+										default => ucfirst((string) $status),
+									};
+									$reasons = $version->eligibility['reasons'] ?? [];
+									$rowModel = $modelOptions->get($version->model_key, [
+										'name' => $version->model_name,
+										'icon' => 'fa-brain',
+									]);
+								@endphp
+								<tr>
+									<td data-label="Aktif" class="model-active-cell">
+										@if($version->is_active)
+											<input class="form-check-input activate-check" type="checkbox" checked disabled aria-label="{{ $versionLabel($version) }} aktif">
+										@elseif($canActivate)
+											<form action="{{ route('admin.models.versions.activate', $version) }}" method="POST" onsubmit="return confirm('Aktifkan {{ $rowModel['name'] }} versi {{ $versionLabel($version) }}?')">
+												@csrf
+												<input class="form-check-input activate-check" type="checkbox" aria-label="Aktifkan {{ $versionLabel($version) }}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
+											</form>
+										@else
+											<input class="form-check-input activate-check" type="checkbox" disabled aria-label="{{ $versionLabel($version) }} tidak bisa diaktifkan">
+										@endif
+									</td>
+									<td data-label="Model">
+										<div class="entity-cell">
+											<span class="entity-avatar">
+												<i class="fa-solid {{ $rowModel['icon'] }}"></i>
+											</span>
+											<div>
+												<div class="table-title">{{ $rowModel['name'] }}</div>
+												<div class="muted-line">{{ $version->model_key }}</div>
 											</div>
 										</div>
-									</div>
-								</td>
-								<td data-label="Rata-rata Akurasi">
-									<span class="metric-pill">{{ $formatMetric($avg) }}</span>
-								</td>
-								<td data-label="Status">
-									@if($run->is_active)
-										<span class="status-chip status-success">Sedang digunakan</span>
-									@elseif($acceptedVersions->isEmpty())
-										<span class="status-chip status-danger">Ditolak evaluasi</span>
-									@elseif($missingArtifact)
-										<span class="status-chip status-warning">Artefak hilang</span>
-									@else
-										<span class="text-muted">-</span>
-									@endif
-								</td>
-								<td data-label="Aksi" class="text-end">
-									<div class="action-stack">
-										<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#runDetail{{ $run->id }}" aria-expanded="false">
-											<i class="fa-solid fa-chart-simple me-1"></i>Detail
-										</button>
-										<form action="{{ route('admin.models.runs.activate', $run) }}" method="POST" onsubmit="return confirm('Gunakan retrain model ini untuk prediksi berikutnya?')">
-											@csrf
-											<button class="btn btn-sm btn-outline-dark" type="submit" @disabled(! $canUse)>
-												Gunakan Retrain Ini
-											</button>
-										</form>
-										<form action="{{ route('admin.models.runs.archive', $run) }}" method="POST" onsubmit="return confirm('Hapus retrain model ini dari daftar aktif?')">
-											@csrf
-											<button class="btn btn-sm btn-outline-danger" type="submit" @disabled($run->is_active || $run->stage === 'legacy_baseline')>
-												Hapus
-											</button>
-										</form>
-									</div>
-								</td>
-							</tr>
-							<tr class="collapse detail-row" id="runDetail{{ $run->id }}">
-								<td colspan="4">
-									<div class="row g-3">
-										<div class="col-lg-3">
-											<div class="pool-mini-stat">
-												<span>Dataset Dipakai</span>
-												<strong>{{ count($run->selected_dataset_ids ?? []) }}</strong>
-												<small>{{ optional($run->finished_at ?? $run->created_at)->format('d M Y H:i') }}</small>
-											</div>
+									</td>
+									<td data-label="Versi">
+										<div class="table-title">{{ $versionLabel($version) }}</div>
+										<div class="muted-line version-note">
+											{{ $version->version_uid }}
+											@if($version->is_default)
+												<span class="status-chip status-primary ms-1">Default pilihan</span>
+											@endif
+											@if(! empty($reasons))
+												<div>{{ implode(' ', array_slice($reasons, 0, 2)) }}</div>
+											@endif
 										</div>
-										<div class="col-lg-9">
-											<div class="table-responsive">
-												<table class="table table-sm admin-table responsive-table align-middle mb-0">
-													<thead>
-														<tr>
-															<th>Model</th>
-															<th>Accuracy</th>
-															<th>Recall</th>
-															<th>F1-score</th>
-															<th>Precision</th>
-															<th>False Negative</th>
-															<th>Status</th>
-														</tr>
-													</thead>
-													<tbody>
-														@foreach($run->modelVersions as $version)
-															<tr>
-																<td data-label="Model" class="fw-bold">{{ $version->model_name }}</td>
-																<td data-label="Accuracy">{{ $formatMetric($metricValue($version, 'accuracy')) }}</td>
-																<td data-label="Recall">{{ $formatMetric($metricValue($version, ['recall_stroke', 'recall'])) }}</td>
-																<td data-label="F1-score">{{ $formatMetric($metricValue($version, ['f1_stroke', 'f1-score', 'f1_score'])) }}</td>
-																<td data-label="Precision">{{ $formatMetric($metricValue($version, ['precision_stroke', 'precision'])) }}</td>
-																<td data-label="False Negative">{{ $falseNegative($version) }}</td>
-																<td data-label="Status">
-																	<span class="status-chip status-{{ $statusTone($version->status) }}">{{ ucfirst($version->status) }}</span>
-																</td>
-															</tr>
-														@endforeach
-													</tbody>
-												</table>
-											</div>
+									</td>
+									<td data-label="Accuracy" class="score-cell">
+										{{ $formatMetric($metricValue($version, 'accuracy')) }}
+									</td>
+									<td data-label="Precision" class="score-cell">
+										{{ $formatMetric($metricValue($version, ['precision_stroke', 'precision'])) }}
+									</td>
+									<td data-label="Recall" class="score-cell">
+										{{ $formatMetric($metricValue($version, ['recall_stroke', 'recall'])) }}
+									</td>
+									<td data-label="F1-score" class="score-cell">
+										{{ $formatMetric($metricValue($version, ['f1_stroke', 'f1-score', 'f1_score'])) }}
+									</td>
+									<td data-label="False Negative" class="score-cell">
+										{{ $falseNegative($version) }}
+									</td>
+									<td data-label="Status">
+										<span class="status-chip status-{{ $statusClass }}">{{ $statusLabel }}</span>
+									</td>
+									<td data-label="Run">
+										<div class="table-title">{{ $runLabel($version) }}</div>
+										<div class="muted-line">
+											{{ optional($version->retrained_at ?? $version->created_at)->format('d M Y H:i') }}
 										</div>
-									</div>
-								</td>
-							</tr>
-						@empty
-							<tr>
-								<td colspan="4" class="text-center text-muted py-5">Belum ada versi retrain model.</td>
-							</tr>
-						@endforelse
-					</tbody>
-				</table>
+									</td>
+								</tr>
+							@empty
+								<tr>
+									<td colspan="10" class="text-center text-muted py-4">
+										{{ $hasModelFilters ? 'Tidak ada versi yang cocok dengan filter.' : 'Belum ada versi model.' }}
+									</td>
+								</tr>
+							@endforelse
+						</tbody>
+					</table>
+				</div>
+
+				@if($versions->hasPages())
+					<div class="model-pagination">
+						<div class="model-pagination-summary">
+							Menampilkan {{ $versions->firstItem() }}-{{ $versions->lastItem() }} dari {{ $versions->total() }} versi
+						</div>
+						{{ $versions->links() }}
+					</div>
+				@elseif($versions->total() > 0)
+					<div class="model-pagination">
+						<div class="model-pagination-summary">
+							{{ $versions->total() }} versi ditampilkan
+						</div>
+					</div>
+				@endif
 			</div>
 		</div>
 	</div>

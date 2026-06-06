@@ -96,7 +96,7 @@ class RunRetrainingJob implements ShouldQueue
 				throw new \RuntimeException($result['message'] ?? 'Retraining gagal tanpa pesan detail.');
 			}
 
-			$this->storeModelVersions($run, $result);
+			$activeModelKeys = $this->storeModelVersions($run, $result);
 
 			$datasetIds = $datasets->pluck('id')->all();
 
@@ -112,23 +112,18 @@ class RunRetrainingJob implements ShouldQueue
 				'updated_at' => now(),
 			]);
 
-			if ((bool) ($result['activated'] ?? false)) {
-				RetrainingRun::where('id', '!=', $run->id)->update([
-					'is_active' => false,
-					'updated_at' => now(),
-				]);
-			}
-
 			$this->updateRun($run, [
 				'status' => RetrainingRun::STATUS_COMPLETED,
-				'is_active' => (bool) ($result['activated'] ?? false),
-				'stage' => (bool) ($result['activated'] ?? false) ? 'completed' : 'completed_not_activated',
+				'is_active' => $activeModelKeys !== [],
+				'stage' => $activeModelKeys !== [] ? 'completed' : 'completed_not_activated',
 				'progress' => 100,
 				'message' => $result['message'] ?? 'Retraining selesai.',
 				'result' => $result,
 				'finished_at' => now(),
-				'activated_at' => (bool) ($result['activated'] ?? false) ? now() : null,
+				'activated_at' => $activeModelKeys !== [] ? now() : null,
 			]);
+
+			$this->refreshRunActivationFlags();
 		} catch (Throwable $exception) {
 			$this->updateRun($run, [
 				'status' => RetrainingRun::STATUS_FAILED,
@@ -188,23 +183,32 @@ class RunRetrainingJob implements ShouldQueue
 		return $relativePath;
 	}
 
-	private function storeModelVersions(RetrainingRun $run, array $result): void
+	private function storeModelVersions(RetrainingRun $run, array $result): array
 	{
-		$activated = (bool) ($result['activated'] ?? false);
-		$defaultModelKey = $run->selected_model_keys[0] ?? array_key_first($result['models'] ?? []) ?? null;
+		$resultModels = $result['models'] ?? [];
+		$activeModelKeys = [];
+		foreach ($resultModels as $modelKey => $modelResult) {
+			if (($modelResult['version']['status'] ?? null) === ModelVersion::STATUS_ACTIVE) {
+				$activeModelKeys[] = $modelKey;
+			}
+		}
 
-		if ($activated) {
+		$defaultModelKey = collect($run->selected_model_keys ?? [])
+			->first(fn ($modelKey) => in_array($modelKey, $activeModelKeys, true))
+			?? ($activeModelKeys[0] ?? null);
+
+		if ($activeModelKeys !== []) {
 			ModelVersion::query()->update([
 				'is_default' => false,
 				'updated_at' => now(),
 			]);
 		}
 
-		foreach (($result['models'] ?? []) as $modelKey => $modelResult) {
+		foreach ($resultModels as $modelKey => $modelResult) {
 			$version = $modelResult['version'] ?? [];
 			$metrics = $modelResult['metrics'] ?? [];
 			$eligibility = $modelResult['eligibility'] ?? [];
-			$isActive = $activated && (bool) ($eligibility['accepted'] ?? false);
+			$isActive = ($version['status'] ?? null) === ModelVersion::STATUS_ACTIVE;
 			$isDefault = $isActive && $modelKey === $defaultModelKey;
 			$versionUid = $version['version_id'] ?? ($modelKey . '-' . now()->format('YmdHis') . '-' . Str::random(6));
 
@@ -214,6 +218,7 @@ class RunRetrainingJob implements ShouldQueue
 					->update([
 						'status' => ModelVersion::STATUS_AVAILABLE,
 						'is_active' => false,
+						'is_default' => false,
 						'updated_at' => now(),
 					]);
 			}
@@ -240,6 +245,29 @@ class RunRetrainingJob implements ShouldQueue
 					'activated_at' => $isActive ? now() : null,
 				]
 			);
+		}
+
+		return $activeModelKeys;
+	}
+
+	private function refreshRunActivationFlags(): void
+	{
+		$activeRunIds = ModelVersion::where('is_active', true)
+			->whereNotNull('retraining_run_id')
+			->pluck('retraining_run_id')
+			->unique()
+			->values();
+
+		RetrainingRun::where('status', RetrainingRun::STATUS_COMPLETED)->update([
+			'is_active' => false,
+			'updated_at' => now(),
+		]);
+
+		if ($activeRunIds->isNotEmpty()) {
+			RetrainingRun::whereIn('id', $activeRunIds)->update([
+				'is_active' => true,
+				'updated_at' => now(),
+			]);
 		}
 	}
 

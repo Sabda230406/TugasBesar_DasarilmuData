@@ -1,0 +1,135 @@
+{
+    "model_name": "KNN",
+    "model_key": "knn",
+    "feature_columns": [
+        "gender",
+        "age",
+        "hypertension",
+        "heart_disease",
+        "ever_married",
+        "work_type",
+        "Residence_type",
+        "avg_glucose_level",
+        "bmi",
+        "smoking_status"
+    ],
+    "accuracy": 0.7407045009784736,
+    "classification_report": {
+        "0": {
+            "precision": 0.9719626168224299,
+            "recall": 0.7489711934156379,
+            "f1-score": 0.8460197559558397,
+            "support": 972.0
+        },
+        "1": {
+            "precision": 0.10622710622710622,
+            "recall": 0.58,
+            "f1-score": 0.17956656346749225,
+            "support": 50.0
+        },
+        "accuracy": 0.7407045009784736,
+        "macro avg": {
+            "precision": 0.539094861524768,
+            "recall": 0.6644855967078189,
+            "f1-score": 0.512793159711666,
+            "support": 1022.0
+        },
+        "weighted avg": {
+            "precision": 0.929607650550643,
+            "recall": 0.7407045009784736,
+            "f1-score": 0.813414413857584,
+            "support": 1022.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            728,
+            244
+        ],
+        [
+            21,
+            29
+        ]
+    ],
+    "evaluation_rows": 1022,
+    "evaluation_dataset": "C:\\Users\\Sabduyyy\\TugasBesar_DasarilmuData\\data\\stroke-evaluation-dataset.csv",
+    "scoring": "fixed_evaluation_dataset",
+    "retrained_at": "20260605-170534",
+    "trained_by": "Sabda Putra Aribawa",
+    "uploaded_rows": 100,
+    "combined_rows": 4138,
+    "training_rows": 3103,
+    "test_rows": 1035,
+    "stroke_0_count": 3921,
+    "stroke_1_count": 217,
+    "training_validation_metrics": {
+        "model_name": "KNN",
+        "model_key": "knn",
+        "feature_columns": [
+            "gender",
+            "age",
+            "hypertension",
+            "heart_disease",
+            "ever_married",
+            "work_type",
+            "Residence_type",
+            "avg_glucose_level",
+            "bmi",
+            "smoking_status"
+        ],
+        "accuracy": 0.748792270531401,
+        "classification_report": {
+            "0": {
+                "precision": 0.9787516600265604,
+                "recall": 0.7512742099898063,
+                "f1-score": 0.8500576701268743,
+                "support": 981.0
+            },
+            "1": {
+                "precision": 0.1347517730496454,
+                "recall": 0.7037037037037037,
+                "f1-score": 0.2261904761904762,
+                "support": 54.0
+            },
+            "accuracy": 0.748792270531401,
+            "macro avg": {
+                "precision": 0.556751716538103,
+                "recall": 0.7274889568467551,
+                "f1-score": 0.5381240731586753,
+                "support": 1035.0
+            },
+            "weighted avg": {
+                "precision": 0.9347168833147215,
+                "recall": 0.748792270531401,
+                "f1-score": 0.8175080773997577,
+                "support": 1035.0
+            }
+        },
+        "confusion_matrix": [
+            [
+                737,
+                244
+            ],
+            [
+                16,
+                38
+            ]
+        ],
+        "best_params": {
+            "model__metric": "manhattan",
+            "model__n_neighbors": 15,
+            "model__weights": "uniform"
+        },
+        "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
+        "scoring": "f1",
+        "random_state": 42,
+        "retrained_at": "20260605-170534",
+        "trained_by": "Sabda Putra Aribawa",
+        "uploaded_rows": 100,
+        "combined_rows": 4138,
+        "training_rows": 3103,
+        "test_rows": 1035,
+        "stroke_0_count": 3921,
+        "stroke_1_count": 217
+    }
+}

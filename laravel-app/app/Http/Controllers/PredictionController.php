@@ -561,7 +561,9 @@ class PredictionController extends Controller
 	private function defaultModelKey(): string
 	{
 		if (Schema::hasTable('model_versions')) {
-			$activeVersion = ModelVersion::where('is_default', true)->first();
+			$activeVersion = ModelVersion::where('is_default', true)
+				->where('is_active', true)
+				->first();
 			if ($activeVersion && $this->modelIsAvailable($activeVersion->model_key)) {
 				return $activeVersion->model_key;
 			}
