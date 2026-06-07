@@ -302,12 +302,12 @@
 					<div class="col-md-6">
 						<label class="form-label" for="weight">Berat Badan (kg)</label>
 						<input class="form-control" id="weight" type="number" step="0.1" min="0"
-							value="{{ old('weight') }}" placeholder="Contoh: 65" required>
+							name="weight" value="{{ old('weight') }}" placeholder="Contoh: 65" required>
 					</div>
 					<div class="col-md-6">
 						<label class="form-label" for="height">Tinggi Badan (cm)</label>
 						<input class="form-control" id="height" type="number" step="0.1" min="0"
-							value="{{ old('height') }}" placeholder="Contoh: 170" required>
+							name="height" value="{{ old('height') }}" placeholder="Contoh: 170" required>
 					</div>
 					<div class="col-md-6">
 						<label class="form-label" for="bmi">BMI (otomatis)</label>

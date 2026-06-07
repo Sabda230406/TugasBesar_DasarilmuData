@@ -6,13 +6,18 @@ use App\Models\HistoryRetrainingUsage;
 use App\Models\ModelVersion;
 use App\Models\RetrainingDataset;
 use App\Models\RetrainingRun;
+use App\Models\User;
+use App\Notifications\PredictionModelUpdatedNotification;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
@@ -124,6 +129,7 @@ class RunRetrainingJob implements ShouldQueue
 			]);
 
 			$this->refreshRunActivationFlags();
+			$this->notifyUsersAboutModelUpdate($run, $activeModelKeys);
 		} catch (Throwable $exception) {
 			$this->updateRun($run, [
 				'status' => RetrainingRun::STATUS_FAILED,
@@ -269,6 +275,24 @@ class RunRetrainingJob implements ShouldQueue
 				'updated_at' => now(),
 			]);
 		}
+	}
+
+	private function notifyUsersAboutModelUpdate(RetrainingRun $run, array $activeModelKeys): void
+	{
+		if ($activeModelKeys === [] || ! Schema::hasTable('notifications')) {
+			return;
+		}
+
+		$cacheKey = "retraining_model_update_notified:{$run->id}";
+		if (Cache::get($cacheKey)) {
+			return;
+		}
+
+		User::where('role', 'user')->chunkById(100, function ($users) use ($run, $activeModelKeys) {
+			Notification::send($users, new PredictionModelUpdatedNotification($run, $activeModelKeys));
+		});
+
+		Cache::forever($cacheKey, true);
 	}
 
 	private function parseRetrainedAt(?string $value): Carbon

@@ -100,21 +100,24 @@
 	<style>
 		.model-switcher {
 			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 			gap: 0.75rem;
 		}
 
 		.model-switch {
-			display: flex;
+			display: grid;
+			grid-template-columns: 42px minmax(0, 1fr) auto;
 			align-items: center;
 			gap: 0.75rem;
 			min-height: 72px;
+			min-width: 0;
 			border: 1px solid var(--admin-line);
 			border-radius: 8px;
 			background: #fff;
 			color: var(--admin-text);
 			text-decoration: none;
 			padding: 0.85rem;
+			overflow: hidden;
 			transition: 0.16s ease;
 		}
 
@@ -135,6 +138,25 @@
 			background: var(--admin-brand-soft);
 			color: var(--admin-brand-deep);
 			flex: 0 0 auto;
+		}
+
+		.model-switch > .flex-grow-1 {
+			min-width: 0;
+			overflow: hidden;
+		}
+
+		.model-switch .table-title,
+		.model-switch .muted-line {
+			display: block;
+			max-width: 100%;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.model-switch .status-chip {
+			justify-self: end;
+			max-width: 100%;
 		}
 
 		.model-list-card {

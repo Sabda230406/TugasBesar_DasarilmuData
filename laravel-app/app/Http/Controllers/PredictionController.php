@@ -33,6 +33,17 @@ class PredictionController extends Controller
 		]);
 	}
 
+	public function retryWithInput(Request $request)
+	{
+		$request->validate(array_merge($this->predictionRules(), $this->formOnlyRules(), [
+			'model' => 'nullable|string',
+		]));
+
+		return redirect()
+			->route('form')
+			->withInput($request->only($this->formPrefillKeys()));
+	}
+
 	public function upload()
 	{
 		$selectedModelKey = $this->defaultModelKey();
@@ -97,6 +108,7 @@ class PredictionController extends Controller
 			'accuracyDisplay' => $this->formatAccuracy($accuracy),
 			'probabilityDisplay' => $this->formatAccuracy($probability),
 			'modelName' => $modelName,
+			'formInput' => $this->formPrefillInput($request, $input, $modelKey),
 		]);
 	}
 
@@ -228,6 +240,28 @@ class PredictionController extends Controller
 			'bmi' => 'required|numeric|min:0|max:100',
 			'smoking_status' => 'required|in:formerly smoked,never smoked,smokes,Unknown',
 		];
+	}
+
+	private function formOnlyRules(): array
+	{
+		return [
+			'weight' => 'nullable|numeric|min:0|max:500',
+			'height' => 'nullable|numeric|min:0|max:300',
+		];
+	}
+
+	private function formPrefillKeys(): array
+	{
+		return array_merge(array_keys($this->predictionRules()), ['model', 'weight', 'height']);
+	}
+
+	private function formPrefillInput(Request $request, array $input, string $modelKey): array
+	{
+		return array_merge($input, [
+			'model' => $modelKey,
+			'weight' => $request->input('weight'),
+			'height' => $request->input('height'),
+		]);
 	}
 
 	private function featureColumns(?string $modelKey = null): array

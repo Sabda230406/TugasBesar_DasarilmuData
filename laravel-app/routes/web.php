@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\RetrainingController;
 use Illuminate\Support\Facades\Route;
@@ -17,10 +18,12 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/form', [PredictionController::class, 'index'])->name('form');
+    Route::post('/form/retry', [PredictionController::class, 'retryWithInput'])->name('form.retry');
     Route::post('/predict', [PredictionController::class, 'predict'])->name('predict');
     Route::get('/upload', [PredictionController::class, 'upload'])->name('upload');
     Route::post('/upload/predict', [PredictionController::class, 'predictUpload'])->name('upload.predict');
     Route::get('/history', [PredictionController::class, 'history'])->name('history');
+    Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.read');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::middleware('admin')->group(function () {

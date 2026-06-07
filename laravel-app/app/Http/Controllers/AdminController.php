@@ -9,6 +9,7 @@ use App\Models\RetrainingDataset;
 use App\Models\RetrainingRun;
 use App\Models\User;
 use App\Jobs\RunRetrainingJob;
+use App\Notifications\RetrainingPoolReadyNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +26,7 @@ class AdminController extends Controller
     private const MIN_CLASS_ROWS = 10;
     private const RETRAINING_LOCK_KEY = 'retraining_in_progress';
     private const RETRAINING_LOCK_STARTED_AT_KEY = 'retraining_started_at';
+    private const RETRAINING_READY_NOTIFICATION_KEY = 'retraining_pool_ready_notified';
     private const RETRAINING_LOCK_TTL_MINUTES = 15;
     private const RETRAINING_COLUMNS = [
         'gender',
@@ -309,6 +311,7 @@ class AdminController extends Controller
 
         RunRetrainingJob::dispatch($run->id);
 
+        Cache::forget(self::RETRAINING_READY_NOTIFICATION_KEY);
         session()->forget('retraining_result');
 
         return back()->with('success', "Retraining #{$run->id} dimulai di background. Kamu boleh pindah halaman, proses tetap berjalan.");
@@ -626,6 +629,32 @@ class AdminController extends Controller
         return User::where('role', 'admin')->count();
     }
 
+    private function notifyAdminsIfRetrainingReady(array $pool): void
+    {
+        if (! Schema::hasTable('notifications')) {
+            return;
+        }
+
+        if (! ($pool['can_retrain'] ?? false)) {
+            Cache::forget(self::RETRAINING_READY_NOTIFICATION_KEY);
+
+            return;
+        }
+
+        if (Cache::get(self::RETRAINING_READY_NOTIFICATION_KEY)) {
+            return;
+        }
+
+        User::where('role', 'admin')->get()->each(function (User $admin) use ($pool) {
+            $admin->notify(new RetrainingPoolReadyNotification($pool));
+        });
+
+        Cache::forever(self::RETRAINING_READY_NOTIFICATION_KEY, [
+            'total_rows' => $pool['total_rows'] ?? 0,
+            'notified_at' => now()->toDateTimeString(),
+        ]);
+    }
+
     private function datasetStatuses(): array
     {
         return [
@@ -828,7 +857,7 @@ class AdminController extends Controller
         $modelsReady = $availableModels !== [];
         $canRetrain = $dataReady && $modelsReady && ! $trainingInProgress;
 
-        return [
+        $summary = [
             'total_rows' => $totalRows,
             'stroke_0' => $stroke0,
             'stroke_1' => $stroke1,
@@ -843,6 +872,10 @@ class AdminController extends Controller
             'missing_messages' => $missingMessages,
             'status_label' => $canRetrain ? 'Siap retraining' : ($trainingInProgress ? 'Sedang training' : 'Belum siap retraining'),
         ];
+
+        $this->notifyAdminsIfRetrainingReady($summary);
+
+        return $summary;
     }
 
     private function poolSummaryForDatasets($datasets, array $models): array

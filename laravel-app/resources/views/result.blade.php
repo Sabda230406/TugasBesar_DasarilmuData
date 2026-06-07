@@ -121,8 +121,19 @@
 			</div>
 
 			<div class="d-flex flex-wrap gap-2">
-				<a href="/history" class="btn btn-dark">Lihat History</a>
-				<a href="/form" class="btn btn-outline-secondary">Input Ulang</a>
+				<a href="{{ route('history') }}" class="btn btn-dark">Lihat History</a>
+				@if(! empty($formInput))
+					<form action="{{ route('form.retry') }}" method="POST" class="d-inline">
+						@csrf
+						@foreach($formInput as $field => $value)
+							@if($value !== null)
+								<input type="hidden" name="{{ $field }}" value="{{ $value }}">
+							@endif
+						@endforeach
+						<button type="submit" class="btn btn-outline-primary">Coba Model Lain</button>
+					</form>
+				@endif
+				<a href="{{ route('form') }}" class="btn btn-outline-secondary">Input Ulang</a>
 			</div>
 		</div>
 	</div>

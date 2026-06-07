@@ -13,38 +13,38 @@
         "bmi",
         "smoking_status"
     ],
-    "accuracy": 0.7563600782778865,
+    "accuracy": 0.7465753424657534,
     "classification_report": {
         "0": {
-            "precision": 0.9713168187744459,
-            "recall": 0.7664609053497943,
-            "f1-score": 0.8568142610695803,
+            "precision": 0.9709379128137384,
+            "recall": 0.7561728395061729,
+            "f1-score": 0.8502024291497976,
             "support": 972.0
         },
         "1": {
-            "precision": 0.10980392156862745,
+            "precision": 0.10566037735849057,
             "recall": 0.56,
-            "f1-score": 0.18360655737704917,
+            "f1-score": 0.17777777777777778,
             "support": 50.0
         },
-        "accuracy": 0.7563600782778865,
+        "accuracy": 0.7465753424657534,
         "macro avg": {
-            "precision": 0.5405603701715367,
-            "recall": 0.6632304526748971,
-            "f1-score": 0.5202104092233147,
+            "precision": 0.5382991450861145,
+            "recall": 0.6580864197530865,
+            "f1-score": 0.5139901034637877,
             "support": 1022.0
         },
         "weighted avg": {
-            "precision": 0.9291684382849245,
-            "recall": 0.7563600782778865,
-            "f1-score": 0.8238784634329593,
+            "precision": 0.9286053523707224,
+            "recall": 0.7465753424657534,
+            "f1-score": 0.8173049413135931,
             "support": 1022.0
         }
     },
     "confusion_matrix": [
         [
-            745,
-            227
+            735,
+            237
         ],
         [
             22,
@@ -54,14 +54,14 @@
     "evaluation_rows": 1022,
     "evaluation_dataset": "C:\\Users\\Sabduyyy\\TugasBesar_DasarilmuData\\data\\stroke-evaluation-dataset.csv",
     "scoring": "fixed_evaluation_dataset",
-    "retrained_at": "20260604-074426",
+    "retrained_at": "20260607-135911",
     "trained_by": "Sabda Putra Aribawa",
-    "uploaded_rows": 101,
-    "combined_rows": 4189,
-    "training_rows": 3141,
+    "uploaded_rows": 143,
+    "combined_rows": 4190,
+    "training_rows": 3142,
     "test_rows": 1048,
-    "stroke_0_count": 3953,
-    "stroke_1_count": 236,
+    "stroke_0_count": 3945,
+    "stroke_1_count": 245,
     "training_validation_metrics": {
         "model_name": "KNN",
         "model_key": "knn",
@@ -77,59 +77,59 @@
             "bmi",
             "smoking_status"
         ],
-        "accuracy": 0.7624045801526718,
+        "accuracy": 0.7557251908396947,
         "classification_report": {
             "0": {
-                "precision": 0.9719387755102041,
-                "recall": 0.7704752275025278,
-                "f1-score": 0.8595600676818951,
-                "support": 989.0
+                "precision": 0.9740596627756161,
+                "recall": 0.7608915906788247,
+                "f1-score": 0.8543799772468714,
+                "support": 987.0
             },
             "1": {
-                "precision": 0.14015151515151514,
-                "recall": 0.6271186440677966,
-                "f1-score": 0.22910216718266255,
-                "support": 59.0
+                "precision": 0.148014440433213,
+                "recall": 0.6721311475409836,
+                "f1-score": 0.24260355029585798,
+                "support": 61.0
             },
-            "accuracy": 0.7624045801526718,
+            "accuracy": 0.7557251908396947,
             "macro avg": {
-                "precision": 0.5560451453308597,
-                "recall": 0.6987969357851622,
-                "f1-score": 0.5443311174322788,
+                "precision": 0.5610370516044145,
+                "recall": 0.7165113691099041,
+                "f1-score": 0.5484917637713647,
                 "support": 1048.0
             },
             "weighted avg": {
-                "precision": 0.9251110576083313,
-                "recall": 0.7624045801526718,
-                "f1-score": 0.824066731680507,
+                "precision": 0.9259787862843121,
+                "recall": 0.7557251908396947,
+                "f1-score": 0.8187708531590738,
                 "support": 1048.0
             }
         },
         "confusion_matrix": [
             [
-                762,
-                227
+                751,
+                236
             ],
             [
-                22,
-                37
+                20,
+                41
             ]
         ],
         "best_params": {
             "model__metric": "manhattan",
             "model__n_neighbors": 15,
-            "model__weights": "distance"
+            "model__weights": "uniform"
         },
         "hpo_method": "GridSearchCV + Pipeline + SMOTENC",
         "scoring": "f1",
         "random_state": 42,
-        "retrained_at": "20260604-074426",
+        "retrained_at": "20260607-135911",
         "trained_by": "Sabda Putra Aribawa",
-        "uploaded_rows": 101,
-        "combined_rows": 4189,
-        "training_rows": 3141,
+        "uploaded_rows": 143,
+        "combined_rows": 4190,
+        "training_rows": 3142,
         "test_rows": 1048,
-        "stroke_0_count": 3953,
-        "stroke_1_count": 236
+        "stroke_0_count": 3945,
+        "stroke_1_count": 245
     }
 }

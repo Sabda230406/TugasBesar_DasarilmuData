@@ -153,6 +153,123 @@
             font-weight: 600;
         }
 
+        .notification-dropdown {
+            position: relative;
+        }
+
+        .notification-button {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            border: 1px solid rgba(187, 247, 208, 0.22);
+            background: rgba(255, 255, 255, 0.12);
+            color: #ecfdf5;
+            position: relative;
+        }
+
+        .notification-button:hover,
+        .notification-button:focus {
+            background: var(--admin-brand-soft);
+            color: var(--admin-bg);
+        }
+
+        .notification-count {
+            position: absolute;
+            top: -5px;
+            right: -4px;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.66rem;
+            font-weight: 900;
+            border: 2px solid var(--admin-bg);
+        }
+
+        .notification-menu {
+            width: min(360px, calc(100vw - 1.5rem));
+            padding: 0.55rem;
+            border-radius: 8px;
+            border: 1px solid var(--admin-line);
+            box-shadow: var(--shadow-md);
+        }
+
+        .notification-menu-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.55rem 0.55rem 0.7rem;
+            border-bottom: 1px solid var(--admin-line);
+            margin-bottom: 0.35rem;
+        }
+
+        .notification-menu-head span {
+            display: block;
+            color: var(--admin-muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .notification-read-btn {
+            color: var(--admin-brand-deep);
+            font-weight: 800;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .notification-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.7rem 0.55rem;
+            border-radius: 8px;
+            color: var(--admin-text);
+            text-decoration: none;
+        }
+
+        .notification-item:hover,
+        .notification-item.is-unread {
+            background: #f0fbf7;
+        }
+
+        .notification-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 34px;
+            background: var(--admin-brand-soft);
+            color: var(--admin-brand-deep);
+        }
+
+        .notification-copy {
+            min-width: 0;
+        }
+
+        .notification-copy strong,
+        .notification-copy small {
+            display: block;
+        }
+
+        .notification-copy small {
+            color: var(--admin-muted);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .notification-empty {
+            padding: 1rem 0.55rem;
+            color: var(--admin-muted);
+            font-weight: 700;
+            text-align: center;
+        }
+
         .admin-auth-btn {
             border-radius: 999px;
             font-weight: 700;
@@ -732,6 +849,7 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mt-lg-0">
                     <span class="admin-badge"><i class="fa-solid fa-lock"></i> Admin Only</span>
                     @auth
+                        @include('partials.notification-dropdown')
                         <div class="dropdown user-dropdown">
                             <button class="btn dropdown-toggle user-pill" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fa-solid fa-user"></i>

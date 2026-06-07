@@ -172,6 +172,123 @@
             font-weight: 600;
         }
 
+        .notification-dropdown {
+            position: relative;
+        }
+
+        .notification-button {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #f8fafc;
+            color: var(--text-main);
+            position: relative;
+        }
+
+        .notification-button:hover,
+        .notification-button:focus {
+            background: var(--brand-light);
+            color: var(--brand-deep);
+        }
+
+        .notification-count {
+            position: absolute;
+            top: -5px;
+            right: -4px;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.66rem;
+            font-weight: 900;
+            border: 2px solid #fff;
+        }
+
+        .notification-menu {
+            width: min(360px, calc(100vw - 1.5rem));
+            padding: 0.55rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-md);
+        }
+
+        .notification-menu-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.55rem 0.55rem 0.7rem;
+            border-bottom: 1px solid var(--line);
+            margin-bottom: 0.35rem;
+        }
+
+        .notification-menu-head span {
+            display: block;
+            color: var(--text-soft);
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .notification-read-btn {
+            color: var(--brand-deep);
+            font-weight: 800;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .notification-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.7rem 0.55rem;
+            border-radius: var(--radius-md);
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .notification-item:hover,
+        .notification-item.is-unread {
+            background: var(--brand-light);
+        }
+
+        .notification-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 34px;
+            background: var(--brand-light);
+            color: var(--brand-deep);
+        }
+
+        .notification-copy {
+            min-width: 0;
+        }
+
+        .notification-copy strong,
+        .notification-copy small {
+            display: block;
+        }
+
+        .notification-copy small {
+            color: var(--text-soft);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .notification-empty {
+            padding: 1rem 0.55rem;
+            color: var(--text-soft);
+            font-weight: 700;
+            text-align: center;
+        }
+
         @media (max-width: 991.98px) {
             .navbar-collapse {
                 padding: 1rem 0 0.4rem;
@@ -235,6 +352,7 @@
 
                 <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mt-lg-0">
                     @auth
+                        @include('partials.notification-dropdown')
                         <div class="dropdown user-dropdown">
                             <button class="btn dropdown-toggle user-pill" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fa-solid fa-user"></i>
