@@ -772,7 +772,7 @@
                 <div class="col-md-4">
                     <div class="team-card">
                         <div class="team-photo-frame">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Ali Nur Hakim" loading="lazy">
+                            <img src="{{ asset('assets/images/Ali.jpg') }}" alt="Foto Ali Nur Hakim" loading="lazy">
                             <span class="team-photo-number">01</span>
                         </div>
                         <h3 class="h5 fw-bold mb-1">Ali Nur Hakim</h3>
@@ -782,7 +782,7 @@
                 <div class="col-md-4">
                     <div class="team-card">
                         <div class="team-photo-frame">
-                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Viona Deva Qaulika" loading="lazy">
+                            <img src="{{ asset('assets/images/viona.jpg') }}" alt="Foto Viona Deva Qaulika" loading="lazy">
                             <span class="team-photo-number">02</span>
                         </div>
                         <h3 class="h5 fw-bold mb-1">Viona Deva Qaulika</h3>
@@ -792,7 +792,7 @@
                 <div class="col-md-4">
                     <div class="team-card">
                         <div class="team-photo-frame">
-                            <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=700&q=80" alt="Foto dummy Sabda Putra Aribawa" loading="lazy">
+                            <img src="{{ asset('assets/images/Sabda.jpg') }}" alt="Foto Sabda Putra Aribawa" loading="lazy">
                             <span class="team-photo-number">03</span>
                         </div>
                         <h3 class="h5 fw-bold mb-1">Sabda Putra Aribawa</h3>
