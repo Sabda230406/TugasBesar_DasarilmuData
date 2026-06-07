@@ -24,5 +24,14 @@ class DatabaseSeeder extends Seeder
                 'role' => 'user',
             ]
         );
+
+        User::updateOrCreate(
+            ['email' => 'mimin@gmail.com'],
+            [
+                'name' => 'Default Mimin',
+                'password' => Hash::make('mimin123'),
+                'role' => 'admin',
+            ]
+        );
     }
 }
