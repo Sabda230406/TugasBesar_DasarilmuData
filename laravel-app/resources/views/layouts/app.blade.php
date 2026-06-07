@@ -289,6 +289,8 @@
             text-align: center;
         }
 
+        @include('partials.pagination-styles')
+
         @media (max-width: 991.98px) {
             .navbar-collapse {
                 padding: 1rem 0 0.4rem;

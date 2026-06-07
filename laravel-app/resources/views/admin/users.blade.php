@@ -169,9 +169,8 @@
 				</table>
 			</div>
 
-			<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
-				<p class="text-muted mb-0">Total admin saat ini: <strong>{{ $adminCount }}</strong></p>
-				{{ $users->links() }}
+			<div class="mt-3">
+				{{ $users->links('vendor.pagination.bootstrap-5', ['itemName' => 'user', 'ariaLabel' => 'Navigasi pengguna']) }}
 			</div>
 		</div>
 	</div>

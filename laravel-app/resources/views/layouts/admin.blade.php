@@ -723,16 +723,7 @@
             font-size: 0.82rem;
         }
 
-        .pagination .page-link {
-            color: var(--admin-brand-deep);
-        }
-
-        .pagination .active .page-link,
-        .pagination .page-link:hover {
-            background: var(--admin-brand-deep);
-            border-color: var(--admin-brand-deep);
-            color: #fff;
-        }
+        @include('partials.pagination-styles')
 
         @media (max-width: 767.98px) {
             .admin-frame {

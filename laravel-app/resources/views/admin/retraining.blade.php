@@ -449,7 +449,7 @@
 		</form>
 
 		<div class="mt-3">
-			{{ $datasets->links() }}
+			{{ $datasets->links('vendor.pagination.bootstrap-5', ['itemName' => 'dataset', 'ariaLabel' => 'Navigasi dataset retraining']) }}
 		</div>
 	</div>
 	</div>

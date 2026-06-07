@@ -214,23 +214,7 @@
 		}
 
 		.model-pagination {
-			display: flex;
-			flex-wrap: wrap;
-			justify-content: space-between;
-			align-items: center;
-			gap: 0.75rem;
-			padding-top: 0.85rem;
-			border-top: 1px solid var(--admin-line);
-		}
-
-		.model-pagination .pagination {
-			margin-bottom: 0;
-		}
-
-		.model-pagination-summary {
-			color: var(--admin-muted);
-			font-size: 0.82rem;
-			font-weight: 700;
+			margin-top: 1rem;
 		}
 
 		@media (max-width: 991.98px) {
@@ -500,14 +484,11 @@
 
 				@if($versions->hasPages())
 					<div class="model-pagination">
-						<div class="model-pagination-summary">
-							Menampilkan {{ $versions->firstItem() }}-{{ $versions->lastItem() }} dari {{ $versions->total() }} versi
-						</div>
-						{{ $versions->links() }}
+						{{ $versions->links('vendor.pagination.bootstrap-5', ['itemName' => 'versi', 'ariaLabel' => 'Navigasi versi model']) }}
 					</div>
 				@elseif($versions->total() > 0)
 					<div class="model-pagination">
-						<div class="model-pagination-summary">
+						<div class="app-pagination-summary">
 							{{ $versions->total() }} versi ditampilkan
 						</div>
 					</div>
